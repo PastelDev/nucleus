@@ -2,6 +2,7 @@
 Nucleus API server.
 File-backed storage for all app data.
 """
+import base64
 import json
 import os
 import shutil
@@ -9,6 +10,7 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI, UploadFile, File, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -123,6 +125,55 @@ async def serve_asset(scope: str, board_id: str, filename: str):
     return Response(content=p.read_bytes(), media_type=ct)
 
 
+# ── AI image generation ──────────────────────────────────────────────────────
+
+@app.post("/api/generate-image")
+async def generate_image(request: Request):
+    body = await request.json()
+    openai_key = body.get("openai_key", "")
+    if not openai_key:
+        return JSONResponse({"error": "No OpenAI API key provided"}, status_code=400)
+
+    scope = body.get("scope")
+    board_id = body.get("board_id")
+    size = body.get("size", "1024x1024")
+    quality = body.get("quality", "auto")
+
+    # batch = list of different prompts; single = one prompt with optional n
+    prompts_list = body.get("prompts")
+    if prompts_list:
+        jobs = [(p, 1) for p in prompts_list]
+    else:
+        jobs = [(body.get("prompt", ""), body.get("n", 1))]
+
+    paths = []
+    async with httpx.AsyncClient(timeout=180) as client:
+        for prompt, n in jobs:
+            resp = await client.post(
+                "https://api.openai.com/v1/images/generations",
+                headers={"Authorization": f"Bearer {openai_key}", "Content-Type": "application/json"},
+                json={"model": "gpt-image-1.5", "prompt": prompt, "size": size, "quality": quality, "n": n},
+            )
+            data = resp.json()
+            if "error" in data:
+                return JSONResponse({"error": data["error"]["message"]}, status_code=400)
+            for img in data.get("data", []):
+                img_bytes = base64.b64decode(img["b64_json"])
+                fname = f"ai_{int(time.time() * 1000)}.png"
+                if scope and board_id:
+                    assets_dir = DATA_DIR / scope / board_id / "assets"
+                    assets_dir.mkdir(parents=True, exist_ok=True)
+                    (assets_dir / fname).write_bytes(img_bytes)
+                    paths.append(f"/api/assets/{scope}/{board_id}/{fname}")
+                else:
+                    out_dir = DATA_DIR / "generated"
+                    out_dir.mkdir(parents=True, exist_ok=True)
+                    (out_dir / fname).write_bytes(img_bytes)
+                    paths.append(f"/api/data/generated/{fname}")
+
+    return JSONResponse({"paths": paths})
+
+
 # ── Delete board ─────────────────────────────────────────────────────────────
 
 @app.delete("/api/boards/{scope}/{board_id}")
@@ -145,7 +196,7 @@ async def init_data():
         "events.json": "[]",
         "notes.json": "[]",
         "pomodoro.json": '{"work": 25, "short": 5, "long": 15}',
-        "config.json": '{"apiKey": "", "model": "stepfun/step-3.5-flash:free"}',
+        "config.json": '{"apiKey": "", "model": "stepfun/step-3.5-flash:free", "openaiKey": ""}',
         "ai-agent.md": DEFAULT_AGENT_MD,
         "ai-memories.md": DEFAULT_MEMORIES_MD,
         "whiteboards/index.json": '{"boards": []}',

@@ -51,9 +51,33 @@ export default function WhiteboardEngine({ scope, title }: Props) {
   useEffect(() => {
     storage.loadBoardIndex(scope).then(idx => {
       setIndex(idx)
-      if (idx.boards.length > 0) setActiveBoardId(idx.boards[0].id)
+      const pending = (window as any).__nucleusSelectBoard
+      if (pending && pending.scope === scope) {
+        delete (window as any).__nucleusSelectBoard
+        const target = idx.boards.find((b: any) => b.id === pending.boardId)
+        setActiveBoardId(target?.id ?? (idx.boards[0]?.id ?? null))
+      } else if (idx.boards.length > 0) {
+        setActiveBoardId(idx.boards[0].id)
+      }
     })
   }, [scope])
+
+  /* ── Agent board selection & reload events ── */
+  useEffect(() => {
+    const handler = (e: CustomEvent) => {
+      if (e.detail.scope !== scope) return
+      if (e.detail.boardId === activeBoardId) {
+        // Reload same board from file (agent placed new items)
+        storage.loadBoard(scope, activeBoardId).then(b => {
+          if (b) { setItems(b.items); setBoardMeta(b) }
+        })
+      } else {
+        setActiveBoardId(e.detail.boardId)
+      }
+    }
+    window.addEventListener('nucleus:select-board', handler as EventListener)
+    return () => window.removeEventListener('nucleus:select-board', handler as EventListener)
+  }, [scope, activeBoardId])
 
   /* ── Load board when active changes ── */
   useEffect(() => {

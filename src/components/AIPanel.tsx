@@ -14,6 +14,8 @@ const AI_TOOLS = [
   { type: 'function', function: { name: 'create_task', description: 'Add a task to Today view', parameters: { type: 'object', properties: { text: { type: 'string' }, date: { type: 'string' } }, required: ['text'] } } },
   { type: 'function', function: { name: 'get_current_view_content', description: 'Read all content and data visible in the current section', parameters: { type: 'object', properties: {} } } },
   { type: 'function', function: { name: 'update_memories', description: 'Update memories to persist important information about the user', parameters: { type: 'object', properties: { content: { type: 'string' } }, required: ['content'] } } },
+  { type: 'function', function: { name: 'generate_image', description: 'Generate image(s) with OpenAI gpt-image-1.5 and place them on a whiteboard or Me board. Requires OpenAI key. Use for concept art, diagrams, visuals, covers, and creative assets.', parameters: { type: 'object', properties: { prompt: { type: 'string', description: 'Detailed image description' }, size: { type: 'string', enum: ['1024x1024', '1536x1024', '1024x1536'], description: 'square | landscape | portrait' }, quality: { type: 'string', enum: ['low', 'medium', 'high', 'auto'] }, n: { type: 'integer', description: 'Number of images 1-4', minimum: 1, maximum: 4 }, scope: { type: 'string', enum: ['whiteboards', 'me'], description: 'Board section to place image in' }, board_id: { type: 'string', description: 'Board ID to place image on' } }, required: ['prompt'] } } },
+  { type: 'function', function: { name: 'generate_images_batch', description: 'Generate multiple images from different prompts and place them on a board. Each prompt produces one image.', parameters: { type: 'object', properties: { prompts: { type: 'array', items: { type: 'string' }, description: 'List of image prompts, one per image' }, size: { type: 'string', enum: ['1024x1024', '1536x1024', '1024x1536'] }, quality: { type: 'string', enum: ['low', 'medium', 'high', 'auto'] }, scope: { type: 'string', enum: ['whiteboards', 'me'] }, board_id: { type: 'string' } }, required: ['prompts'] } } },
 ]
 
 /* ── Context builder ── */
@@ -114,6 +116,37 @@ export default function AIPanel({
       }
       case 'get_current_view_content': return { section, content: ctxText }
       case 'update_memories': setMemoriesMd(args.content); setMemBuf(args.content); return { ok: true }
+      case 'generate_image':
+      case 'generate_images_batch': {
+        if (!aiConfig.openaiKey) return { error: 'OpenAI API key not set — add it in the config bar below the model ID' }
+        const payload: any = {
+          openai_key: aiConfig.openaiKey,
+          size: args.size || '1024x1024',
+          quality: args.quality || 'auto',
+        }
+        if (name === 'generate_images_batch') payload.prompts = args.prompts
+        else { payload.prompt = args.prompt; payload.n = args.n || 1 }
+        if (args.scope && args.board_id) { payload.scope = args.scope; payload.board_id = args.board_id }
+        const genRes = await fetch('/api/generate-image', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        })
+        const genData = await genRes.json()
+        if (genData.error) return { error: genData.error }
+        if (args.scope && args.board_id && genData.paths?.length) {
+          const board = await store.loadBoard(args.scope as 'whiteboards' | 'me', args.board_id)
+          if (board) {
+            const newImgs = (genData.paths as string[]).map((src, i) => ({
+              id: uid(), type: 'image' as const,
+              x: 200 + i * 540, y: 200, w: 512, h: 512, src, name: `AI Image ${i + 1}`,
+            }))
+            await store.saveBoard(args.scope as 'whiteboards' | 'me', { ...board, items: [...board.items, ...newImgs], updatedAt: Date.now() })
+            ;(window as any).__nucleusSelectBoard = { scope: args.scope, boardId: args.board_id }
+            setSection(args.scope === 'me' ? 'me' : 'whiteboard')
+            window.dispatchEvent(new CustomEvent('nucleus:select-board', { detail: { scope: args.scope, boardId: args.board_id } }))
+          }
+        }
+        return { ok: true, paths: genData.paths, count: genData.paths.length }
+      }
       default: return { error: `Unknown tool: ${name}` }
     }
   }
@@ -195,13 +228,18 @@ export default function AIPanel({
       {/* ── CHAT TAB ── */}
       {tab === 'chat' && (
         <>
-          <div style={{ padding: '8px 12px', borderBottom: '1px solid #0e0e18', background: '#0b0b14', display: 'flex', gap: 6, flexShrink: 0 }}>
-            <input value={aiConfig.apiKey} onChange={e => updateConfig({ apiKey: e.target.value })} type="password"
-              placeholder="OpenRouter API key..."
-              style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 7, padding: '5px 9px', color: 'var(--text-secondary)', fontSize: '0.72rem', outline: 'none', fontFamily: 'inherit', minWidth: 0 }} />
-            <input value={aiConfig.model} onChange={e => updateConfig({ model: e.target.value })}
-              placeholder="Model ID"
-              style={{ width: 120, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 7, padding: '5px 9px', color: 'var(--text-secondary)', fontSize: '0.72rem', outline: 'none', fontFamily: 'inherit', flexShrink: 0 }} />
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid #0e0e18', background: '#0b0b14', display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0 }}>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input value={aiConfig.apiKey} onChange={e => updateConfig({ apiKey: e.target.value })} type="password"
+                placeholder="OpenRouter key..."
+                style={{ flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 7, padding: '5px 9px', color: 'var(--text-secondary)', fontSize: '0.72rem', outline: 'none', fontFamily: 'inherit', minWidth: 0 }} />
+              <input value={aiConfig.model} onChange={e => updateConfig({ model: e.target.value })}
+                placeholder="Model ID"
+                style={{ width: 114, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 7, padding: '5px 9px', color: 'var(--text-secondary)', fontSize: '0.72rem', outline: 'none', fontFamily: 'inherit', flexShrink: 0 }} />
+            </div>
+            <input value={aiConfig.openaiKey} onChange={e => updateConfig({ openaiKey: e.target.value })} type="password"
+              placeholder="OpenAI key (for image generation)..."
+              style={{ width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 7, padding: '5px 9px', color: 'var(--text-secondary)', fontSize: '0.72rem', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: 12 }}>
             {msgs.length === 0 && (

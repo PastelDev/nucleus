@@ -101,6 +101,7 @@ export interface PomodoroSettings {
 export interface AIConfig {
   apiKey: string
   model: string
+  openaiKey: string
 }
 
 /* ── App state ── */

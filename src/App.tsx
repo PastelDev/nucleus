@@ -40,7 +40,7 @@ export default function App() {
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [notes, setNotes] = useState<Note[]>([])
   const [pomSettings, setPomSettings] = useState<PomodoroSettings>({ work: 25, short: 5, long: 15 })
-  const [aiConfig, setAiConfig] = useState<AIConfig>({ apiKey: '', model: 'stepfun/step-3.5-flash:free' })
+  const [aiConfig, setAiConfig] = useState<AIConfig>({ apiKey: '', model: 'stepfun/step-3.5-flash:free', openaiKey: '' })
   const [agentMd, setAgentMd] = useState(DEFAULT_AGENT_MD)
   const [memoriesMd, setMemoriesMd] = useState(DEFAULT_MEMORIES_MD)
   const [aiOpen, setAiOpen] = useState(false)
