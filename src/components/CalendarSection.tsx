@@ -35,8 +35,8 @@ export default function CalendarSection({ events, setEvents }: Props) {
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       {/* Calendar grid */}
-      <div style={{ flex: 1, padding: '26px 28px', overflow: 'auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
+      <div style={{ flex: 1, padding: '24px 28px 12px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexShrink: 0 }}>
           <h2 style={{
             margin: 0, color: 'var(--text-primary)', fontWeight: 800, fontSize: '1.5rem',
             letterSpacing: '-0.03em', fontFamily: 'var(--font-heading)',
@@ -49,52 +49,56 @@ export default function CalendarSection({ events, setEvents }: Props) {
         </div>
 
         {/* Day headers */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 3, flexShrink: 0 }}>
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-            <div key={d} style={{ textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.1em', padding: '5px 0' }}>{d}</div>
+            <div key={d} style={{ textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.08em', padding: '4px 0' }}>{d}</div>
           ))}
         </div>
 
-        {/* Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
+        {/* Grid — fills remaining height */}
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gridAutoRows: '1fr', gap: 3, minHeight: 0 }}>
           {cells.map((d, i) => (
             <div key={i}
               onDragOver={d ? e => e.preventDefault() : undefined}
               onDrop={d && dragId ? () => { setEvents(p => p.map(ev => ev.id === dragId ? { ...ev, date: dk(d) } : ev)); setDragId(null) } : undefined}
               onClick={() => d && setSelDay(d === selDay ? null : d)}
               style={{
-                minHeight: 78, background: d ? (selDay === d ? 'var(--accent-surface)' : 'var(--bg-surface)') : 'transparent',
-                borderRadius: 'var(--radius)', padding: '7px 8px',
+                background: d ? (selDay === d ? 'var(--accent-surface)' : 'var(--bg-surface)') : 'transparent',
+                borderRadius: 'var(--radius)', padding: '8px 10px',
                 cursor: d ? 'pointer' : 'default',
-                border: `1px solid ${selDay === d ? 'var(--border-focus)' : 'var(--border)'}`,
-                transition: 'all 0.12s',
+                border: `1px solid ${selDay === d ? 'var(--border-focus)' : d ? 'var(--border)' : 'transparent'}`,
+                transition: 'background 0.12s, border-color 0.12s',
+                overflow: 'hidden',
               }}>
               {d && (
                 <>
                   <div style={{
-                    fontSize: '0.78rem', fontWeight: isToday(d) ? 700 : 500,
-                    color: isToday(d) ? '#fff' : '#555570',
+                    fontSize: '0.8rem', fontWeight: isToday(d) ? 700 : 500,
+                    color: isToday(d) ? '#fff' : 'var(--text-muted)',
                     background: isToday(d) ? 'var(--accent)' : 'transparent',
-                    borderRadius: '50%', width: 22, height: 22,
+                    borderRadius: '50%', width: 24, height: 24,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: 4,
                   }}>{d}</div>
-                  <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {dayEvs(d).slice(0, 2).map(ev => (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {dayEvs(d).slice(0, 3).map(ev => (
                       <div key={ev.id} draggable onDragStart={() => setDragId(ev.id)} style={{
-                        fontSize: '0.62rem', background: ev.color + '28',
+                        fontSize: '0.65rem', background: ev.color + '28',
                         borderLeft: `2px solid ${ev.color}`, color: ev.color,
-                        borderRadius: '0 3px 3px 0', padding: '1px 4px',
+                        borderRadius: '0 3px 3px 0', padding: '2px 5px',
                         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'grab',
+                        fontWeight: 500,
                       }}>{ev.time ? `${ev.time} ` : ''}{ev.title}</div>
                     ))}
-                    {dayEvs(d).length > 2 && <div style={{ fontSize: '0.58rem', color: 'var(--text-muted)' }}>+{dayEvs(d).length - 2} more</div>}
+                    {dayEvs(d).length > 3 && <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', paddingLeft: 5 }}>+{dayEvs(d).length - 3} more</div>}
                   </div>
                 </>
               )}
             </div>
           ))}
         </div>
-        <div style={{ marginTop: 10, fontSize: '0.7rem', color: 'var(--text-faint)', textAlign: 'center' }}>
+
+        <div style={{ paddingTop: 8, fontSize: '0.68rem', color: 'var(--text-ghost)', textAlign: 'center', flexShrink: 0 }}>
           Drag events to reschedule · Click a day to add
         </div>
       </div>

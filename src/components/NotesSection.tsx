@@ -114,9 +114,9 @@ export default function NotesSection({ notes, setNotes }: Props) {
       </div>
 
       {/* Note detail */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {!sel ? (
-          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)' }}>
             <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ marginBottom: 14 }}>
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
             </svg>
@@ -127,6 +127,7 @@ export default function NotesSection({ notes, setNotes }: Props) {
             }}>New Note</button>
           </div>
         ) : (
+          <div style={{ flex: 1, overflowY: 'auto' }}>
           <div style={{ padding: '32px 40px', maxWidth: 760 }}>
             {/* Title */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18, gap: 16 }}>
@@ -206,6 +207,7 @@ export default function NotesSection({ notes, setNotes }: Props) {
                 }
               </div>
             )}
+          </div>
           </div>
         )}
       </div>
