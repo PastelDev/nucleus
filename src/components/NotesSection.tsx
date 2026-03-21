@@ -41,7 +41,7 @@ export default function NotesSection({ notes, setNotes }: Props) {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
       {/* Sidebar list */}
       <div style={{
         width: 248, flexShrink: 0, borderRight: '1px solid var(--border)',

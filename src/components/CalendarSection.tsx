@@ -33,7 +33,7 @@ export default function CalendarSection({ events, setEvents }: Props) {
   const selEvs = selDay ? events.filter(e => e.date === dk(selDay)).sort((a, b) => (a.time || '').localeCompare(b.time || '')) : []
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
       {/* Calendar grid */}
       <div style={{ flex: 1, padding: '24px 28px 12px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexShrink: 0 }}>
