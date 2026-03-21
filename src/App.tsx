@@ -10,6 +10,7 @@ import MeSection from './components/MeSection'
 import CalendarSection from './components/CalendarSection'
 import PomodoroSection from './components/PomodoroSection'
 import AIPanel from './components/AIPanel'
+import AISettingsSection from './components/AISettingsSection'
 
 const DEFAULT_AGENT_MD = `# Nucleus AI Agent
 
@@ -40,7 +41,7 @@ export default function App() {
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [notes, setNotes] = useState<Note[]>([])
   const [pomSettings, setPomSettings] = useState<PomodoroSettings>({ work: 25, short: 5, long: 15 })
-  const [aiConfig, setAiConfig] = useState<AIConfig>({ apiKey: '', model: 'stepfun/step-3.5-flash:free', openaiKey: '' })
+  const [aiConfig, setAiConfig] = useState<AIConfig>({ apiKey: '', model: 'stepfun/step-3.5-flash:free', openaiKey: '', permMode: 'allow', permCustom: {} })
   const [agentMd, setAgentMd] = useState(DEFAULT_AGENT_MD)
   const [memoriesMd, setMemoriesMd] = useState(DEFAULT_MEMORIES_MD)
   const [aiOpen, setAiOpen] = useState(false)
@@ -107,6 +108,17 @@ export default function App() {
             <PomodoroSection settings={pomSettings} setSettings={setPomSettings} />
           </div>
         )}
+        {section === 'ai-settings' && (
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            <AISettingsSection
+              notes={notes} events={events} tasks={tasks}
+              section={section} pomSettings={pomSettings}
+              agentMd={agentMd} setAgentMd={setAgentMd}
+              memoriesMd={memoriesMd} setMemoriesMd={setMemoriesMd}
+              aiConfig={aiConfig} setAiConfig={setAiConfig}
+            />
+          </div>
+        )}
       </div>
 
       {/* AI Panel */}
@@ -116,9 +128,8 @@ export default function App() {
           section={section} pomSettings={pomSettings}
           setNotes={setNotes} setEvents={setEvents} setTasks={setTasks}
           setSection={setSection} setPomSettings={setPomSettings}
-          agentMd={agentMd} setAgentMd={setAgentMd}
-          memoriesMd={memoriesMd} setMemoriesMd={setMemoriesMd}
-          aiConfig={aiConfig} setAiConfig={setAiConfig}
+          agentMd={agentMd} memoriesMd={memoriesMd} setMemoriesMd={setMemoriesMd}
+          aiConfig={aiConfig}
           onClose={() => setAiOpen(false)}
         />
       )}

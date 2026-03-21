@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { PomodoroSettings } from '../lib/types'
 
 interface Props {
@@ -8,53 +8,53 @@ interface Props {
 
 type PomMode = 'work' | 'break' | 'longbreak'
 
+const getDur = (mode: PomMode, s: PomodoroSettings) =>
+  ({ work: s.work, break: s.short, longbreak: s.long }[mode]) * 60
+
 export default function PomodoroSection({ settings, setSettings }: Props) {
   const [mode, setMode] = useState<PomMode>('work')
-  const [mins, setMins] = useState(settings.work)
-  const [secs, setSecs] = useState(0)
+  const [timeLeft, setTimeLeft] = useState(settings.work * 60)
   const [running, setRunning] = useState(false)
   const [sessions, setSessions] = useState(0)
   const intRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const modeRef = useRef(mode)
+  useEffect(() => { modeRef.current = mode }, [mode])
 
-  const dur = useCallback(
-    () => ({ work: settings.work, break: settings.short, longbreak: settings.long }[mode]),
-    [mode, settings],
-  )
-
+  /* reset when settings change and not running */
   useEffect(() => {
-    if (!running) { setMins(dur()); setSecs(0) }
+    if (!running) setTimeLeft(getDur(mode, settings))
   }, [settings])
 
+  /* interval — single decrement avoids setState-inside-setState glitch */
   useEffect(() => {
-    if (running) {
-      intRef.current = setInterval(() => {
-        setSecs(s => {
-          if (s === 0) {
-            setMins(m => {
-              if (m === 0) { setRunning(false); if (mode === 'work') setSessions(n => n + 1); return 0 }
-              return m - 1
-            })
-            return 59
-          }
-          return s - 1
-        })
-      }, 1000)
-    }
+    if (!running) return
+    intRef.current = setInterval(() => {
+      setTimeLeft(t => {
+        if (t <= 1) {
+          clearInterval(intRef.current!)
+          setTimeout(() => {
+            setRunning(false)
+            if (modeRef.current === 'work') setSessions(n => n + 1)
+          }, 0)
+          return 0
+        }
+        return t - 1
+      })
+    }, 1000)
     return () => { if (intRef.current) clearInterval(intRef.current) }
-  }, [running, mode])
+  }, [running])
 
   const switchMode = (m: PomMode) => {
     if (intRef.current) clearInterval(intRef.current)
-    setRunning(false); setMode(m)
-    const d = { work: settings.work, break: settings.short, longbreak: settings.long }[m]
-    setMins(d); setSecs(0)
+    setRunning(false); setMode(m); setTimeLeft(getDur(m, settings))
   }
 
-  const reset = () => { setRunning(false); setMins(dur()); setSecs(0) }
+  const reset = () => { setRunning(false); setTimeLeft(getDur(mode, settings)) }
 
-  const total = dur() * 60
-  const elapsed = total - (mins * 60 + secs)
-  const pct = Math.min(elapsed / total, 1)
+  const mins = Math.floor(timeLeft / 60)
+  const secs = timeLeft % 60
+  const total = getDur(mode, settings)
+  const pct = Math.min((total - timeLeft) / total, 1)
   const R = 90, circ = 2 * Math.PI * R
   const acc = mode === 'work' ? 'var(--accent)' : mode === 'break' ? 'var(--green)' : 'var(--blue)'
 
@@ -64,7 +64,6 @@ export default function PomodoroSection({ settings, setSettings }: Props) {
         Focus Timer
       </h2>
 
-      {/* Mode toggle */}
       <div style={{ display: 'flex', gap: 5, background: 'var(--bg-surface)', borderRadius: 13, padding: 5, marginBottom: 44 }}>
         {([['work', 'Work'], ['break', 'Short Break'], ['longbreak', 'Long Break']] as [PomMode, string][]).map(([m, l]) => (
           <button key={m} onClick={() => switchMode(m)} style={{
@@ -75,7 +74,6 @@ export default function PomodoroSection({ settings, setSettings }: Props) {
         ))}
       </div>
 
-      {/* Timer ring */}
       <div style={{ position: 'relative', marginBottom: 36 }}>
         <svg width={224} height={224} style={{ transform: 'rotate(-90deg)' }}>
           <circle cx={112} cy={112} r={R} stroke="#161625" strokeWidth={11} fill="none" />
@@ -93,7 +91,6 @@ export default function PomodoroSection({ settings, setSettings }: Props) {
         </div>
       </div>
 
-      {/* Controls */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 30 }}>
         <button onClick={reset} style={{
           background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 12,
@@ -106,7 +103,6 @@ export default function PomodoroSection({ settings, setSettings }: Props) {
         }}>{running ? 'Pause' : 'Start'}</button>
       </div>
 
-      {/* Session dots */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 36 }}>
         {[1, 2, 3, 4].map(i => (
           <div key={i} style={{
@@ -120,7 +116,6 @@ export default function PomodoroSection({ settings, setSettings }: Props) {
         </span>
       </div>
 
-      {/* Custom durations */}
       <div style={{
         background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-xl)',
         padding: '20px 24px', width: '100%', boxSizing: 'border-box',

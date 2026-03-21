@@ -104,10 +104,10 @@ export async function uploadImage(scope: 'whiteboards' | 'me', boardId: string, 
 
 /* ── AI config (separate, gitignored) ── */
 
-export async function loadAIConfig(): Promise<{ apiKey: string; model: string; openaiKey: string }> {
-  return loadJSON('config.json', { apiKey: '', model: 'stepfun/step-3.5-flash:free', openaiKey: '' })
+export async function loadAIConfig(): Promise<import('./types').AIConfig> {
+  return loadJSON('config.json', { apiKey: '', model: 'stepfun/step-3.5-flash:free', openaiKey: '', permMode: 'allow', permCustom: {} })
 }
 
-export async function saveAIConfig(config: { apiKey: string; model: string; openaiKey: string }): Promise<void> {
+export async function saveAIConfig(config: import('./types').AIConfig): Promise<void> {
   return saveJSON('config.json', config)
 }

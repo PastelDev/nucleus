@@ -1,5 +1,5 @@
 /* ── App sections ── */
-export type Section = 'today' | 'notes' | 'whiteboard' | 'me' | 'calendar' | 'pomodoro'
+export type Section = 'today' | 'notes' | 'whiteboard' | 'me' | 'calendar' | 'pomodoro' | 'ai-settings'
 
 /* ── Tasks ── */
 export interface Task {
@@ -102,6 +102,8 @@ export interface AIConfig {
   apiKey: string
   model: string
   openaiKey: string
+  permMode: 'allow' | 'ask' | 'custom'
+  permCustom: Record<string, true>  // tool names auto-allowed in custom mode
 }
 
 /* ── App state ── */

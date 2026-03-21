@@ -122,38 +122,52 @@ export default function Sidebar({ section, setSection, aiOpen, setAiOpen, collap
         })}
       </nav>
 
-      {/* AI Agent toggle */}
-      <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 10, marginTop: 6 }}>
+      {/* AI bottom section */}
+      <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 10, marginTop: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {/* AI Settings */}
         <button
-          onClick={() => setAiOpen(!aiOpen)}
-          title={collapsed ? 'AI Agent' : undefined}
+          onClick={() => setSection('ai-settings')}
+          title={collapsed ? 'AI Settings' : undefined}
           style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
+            width: '100%', display: 'flex', alignItems: 'center', gap: 10,
             padding: collapsed ? '10px 0' : '10px 12px',
             justifyContent: collapsed ? 'center' : 'flex-start',
-            borderRadius: 'var(--radius)',
-            border: 'none',
-            background: aiOpen ? 'var(--accent-surface)' : 'transparent',
-            color: aiOpen ? 'var(--accent-light)' : 'var(--text-muted)',
-            cursor: 'pointer',
-            fontSize: '0.88rem',
-            fontWeight: aiOpen ? 700 : 500,
-            textAlign: 'left',
-            transition: 'all 0.12s',
-            fontFamily: 'inherit',
+            borderRadius: 'var(--radius)', border: 'none',
+            background: section === 'ai-settings' ? 'var(--accent-surface)' : 'transparent',
+            color: section === 'ai-settings' ? 'var(--accent-light)' : 'var(--text-muted)',
+            cursor: 'pointer', fontSize: '0.88rem',
+            fontWeight: section === 'ai-settings' ? 700 : 500,
+            textAlign: 'left', transition: 'all 0.12s', fontFamily: 'inherit',
           }}
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 2a7 7 0 0 1 7 7c0 3-1.5 5.2-3 6.5V18a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.5C6.5 14.2 5 12 5 9a7 7 0 0 1 7-7zM9 22h6" />
           </svg>
           {!collapsed && (
-            <>
-              AI Agent
-              {aiOpen && <div style={{ marginLeft: 'auto', width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />}
-            </>
+            <>AI Settings{section === 'ai-settings' && <div style={{ marginLeft: 'auto', width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />}</>
+          )}
+        </button>
+        {/* AI Chat toggle */}
+        <button
+          onClick={() => setAiOpen(!aiOpen)}
+          title={collapsed ? 'AI Chat' : undefined}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+            padding: collapsed ? '10px 0' : '10px 12px',
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            borderRadius: 'var(--radius)', border: 'none',
+            background: aiOpen ? '#0d1a0d' : 'transparent',
+            color: aiOpen ? 'var(--green)' : 'var(--text-muted)',
+            cursor: 'pointer', fontSize: '0.88rem',
+            fontWeight: aiOpen ? 700 : 500,
+            textAlign: 'left', transition: 'all 0.12s', fontFamily: 'inherit',
+          }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          {!collapsed && (
+            <>AI Chat{aiOpen && <div style={{ marginLeft: 'auto', width: 5, height: 5, borderRadius: '50%', background: 'var(--green)', flexShrink: 0 }} />}</>
           )}
         </button>
       </div>
