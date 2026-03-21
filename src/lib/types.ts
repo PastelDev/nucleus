@@ -1,5 +1,5 @@
 /* ── App sections ── */
-export type Section = 'today' | 'notes' | 'whiteboard' | 'me' | 'calendar' | 'pomodoro' | 'ai-settings'
+export type Section = 'today' | 'notes' | 'whiteboard' | 'me' | 'calendar' | 'pomodoro' | 'settings' | 'ai-settings' | 'artefacts'
 
 /* ── Tasks ── */
 export interface Task {
@@ -10,12 +10,15 @@ export interface Task {
 }
 
 /* ── Calendar events ── */
+export type EventRecurrence = 'none' | 'daily' | 'weekly' | 'yearly'
+
 export interface CalendarEvent {
   id: string
   title: string
   date: string // YYYY-MM-DD
   time?: string // HH:MM
   color: string
+  recurrence?: EventRecurrence
 }
 
 /* ── Notes ── */
@@ -90,11 +93,59 @@ export interface BoardIndex {
   boards: { id: string; name: string; parentId?: string }[]
 }
 
+/* ── Artefacts ── */
+export type ArtefactType = 'html' | 'react'
+
+export interface Artefact {
+  id: string
+  title: string
+  type: ArtefactType
+  code: string
+  createdAt: number
+  updatedAt: number
+}
+
 /* ── Pomodoro ── */
 export interface PomodoroSettings {
   work: number
   short: number
   long: number
+  rounds: number
+}
+
+/* ── Theme settings ── */
+export interface ThemeDefinition {
+  id: string
+  name: string
+  font: string
+  fontHeading: string
+  fontMono: string
+  bgDeep: string
+  bgSidebar: string
+  bgSurface: string
+  bgElevated: string
+  bgInput: string
+  boardBg: string
+  boardGrid: string
+  border: string
+  borderSubtle: string
+  textPrimary: string
+  textSecondary: string
+  textMuted: string
+  textFaint: string
+  textGhost: string
+  accent: string
+  accentLight: string
+  green: string
+  blue: string
+  red: string
+  orange: string
+  pink: string
+}
+
+export interface ThemeSettings {
+  activeThemeId: string
+  themes: ThemeDefinition[]
 }
 
 /* ── AI config ── */
@@ -112,6 +163,7 @@ export interface AppState {
   events: CalendarEvent[]
   notes: Note[]
   pomSettings: PomodoroSettings
+  themeSettings: ThemeSettings
   aiConfig: AIConfig
   agentMd: string
   memoriesMd: string

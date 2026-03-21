@@ -13,6 +13,8 @@ const NAV: NavItem[] = [
   { id: 'me', label: 'Me', icon: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z' },
   { id: 'calendar', label: 'Calendar', icon: 'M19 4H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zM16 2v4M8 2v4M3 10h18' },
   { id: 'pomodoro', label: 'Focus', icon: 'M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zM12 6v6l4 2' },
+  { id: 'artefacts', label: 'Artefacts', icon: 'M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm0 5h16M8 3v5' },
+  { id: 'settings', label: 'Settings', icon: 'M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z' },
 ]
 
 interface Props {
@@ -156,8 +158,8 @@ export default function Sidebar({ section, setSection, aiOpen, setAiOpen, collap
             padding: collapsed ? '10px 0' : '10px 12px',
             justifyContent: collapsed ? 'center' : 'flex-start',
             borderRadius: 'var(--radius)', border: 'none',
-            background: aiOpen ? '#0d1a0d' : 'transparent',
-            color: aiOpen ? 'var(--green)' : 'var(--text-muted)',
+            background: aiOpen ? 'var(--accent-surface)' : 'transparent',
+            color: aiOpen ? 'var(--accent-light)' : 'var(--text-muted)',
             cursor: 'pointer', fontSize: '0.88rem',
             fontWeight: aiOpen ? 700 : 500,
             textAlign: 'left', transition: 'all 0.12s', fontFamily: 'inherit',
@@ -167,7 +169,7 @@ export default function Sidebar({ section, setSection, aiOpen, setAiOpen, collap
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
           {!collapsed && (
-            <>AI Chat{aiOpen && <div style={{ marginLeft: 'auto', width: 5, height: 5, borderRadius: '50%', background: 'var(--green)', flexShrink: 0 }} />}</>
+            <>AI Chat{aiOpen && <div style={{ marginLeft: 'auto', width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />}</>
           )}
         </button>
       </div>

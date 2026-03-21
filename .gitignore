@@ -2,10 +2,18 @@ node_modules/
 dist/
 .vite/
 
-# Runtime data (API key etc)
+# Personal data — gitignored, never commit
 data/config.json
-data/whiteboards/*/assets/
-data/me/*/assets/
+data/tasks.json
+data/notes.json
+data/artefacts.json
+data/events.json
+data/pomodoro.json
+data/theme-settings.json
+data/ai-agent.local.md
+data/ai-memories.md
+data/me/
+data/whiteboards/
 
 # Python
 __pycache__/

@@ -1,33 +1,41 @@
 import { useState, useEffect, useRef } from 'react'
-import type { Note, CalendarEvent, Task, PomodoroSettings, Section, AIConfig } from '../lib/types'
+import type { Note, CalendarEvent, Task, PomodoroSettings, Section, AIConfig, Artefact } from '../lib/types'
 import { uid, today } from '../lib/helpers'
 import * as store from '../lib/storage'
+import { listEventOccurrencesInRange, recurrenceLabel } from '../lib/calendar'
 import Markdown from './Markdown'
 
 /* ── Tool definitions ── */
 const AI_TOOLS = [
-  { type: 'function', function: { name: 'navigate_to', description: 'Switch to a different section of the app', parameters: { type: 'object', properties: { section: { type: 'string', enum: ['today', 'notes', 'whiteboard', 'me', 'calendar', 'pomodoro', 'ai-settings'] } }, required: ['section'] } } },
-  { type: 'function', function: { name: 'create_calendar_event', description: 'Create a new event on the calendar', parameters: { type: 'object', properties: { title: { type: 'string' }, date: { type: 'string', description: 'YYYY-MM-DD' }, time: { type: 'string' }, color: { type: 'string' } }, required: ['title', 'date'] } } },
+  { type: 'function', function: { name: 'navigate_to', description: 'Switch to a different section of the app', parameters: { type: 'object', properties: { section: { type: 'string', enum: ['today', 'notes', 'whiteboard', 'me', 'calendar', 'pomodoro', 'ai-settings', 'artefacts'] } }, required: ['section'] } } },
+  { type: 'function', function: { name: 'create_calendar_event', description: 'Create a new event on the calendar, optionally recurring daily, weekly, or yearly.', parameters: { type: 'object', properties: { title: { type: 'string' }, date: { type: 'string', description: 'YYYY-MM-DD' }, time: { type: 'string' }, color: { type: 'string' }, recurrence: { type: 'string', enum: ['none', 'daily', 'weekly', 'yearly'] } }, required: ['title', 'date'] } } },
   { type: 'function', function: { name: 'set_pomodoro', description: 'Configure Pomodoro timer durations', parameters: { type: 'object', properties: { work_minutes: { type: 'number' }, short_break_minutes: { type: 'number' }, long_break_minutes: { type: 'number' }, navigate: { type: 'boolean' } } } } },
   { type: 'function', function: { name: 'create_note', description: 'Create a new note with markdown content', parameters: { type: 'object', properties: { title: { type: 'string' }, content: { type: 'string' }, tags: { type: 'array', items: { type: 'string' } } }, required: ['title', 'content'] } } },
   { type: 'function', function: { name: 'edit_note', description: 'Edit an existing note by its ID', parameters: { type: 'object', properties: { note_id: { type: 'string' }, title: { type: 'string' }, content: { type: 'string' }, tags: { type: 'array', items: { type: 'string' } } }, required: ['note_id'] } } },
   { type: 'function', function: { name: 'create_task', description: 'Add a task to Today view', parameters: { type: 'object', properties: { text: { type: 'string' }, date: { type: 'string' } }, required: ['text'] } } },
-  { type: 'function', function: { name: 'get_current_view_content', description: 'Read all content visible in the current section', parameters: { type: 'object', properties: {} } } },
+  { type: 'function', function: { name: 'get_current_view_content', description: 'Read the live context summary (all sections overview)', parameters: { type: 'object', properties: {} } } },
+  { type: 'function', function: { name: 'read_note', description: 'Read the full content of a specific note by ID', parameters: { type: 'object', properties: { note_id: { type: 'string' } }, required: ['note_id'] } } },
+  { type: 'function', function: { name: 'get_all_tasks', description: 'Get tasks filtered by date range', parameters: { type: 'object', properties: { date_from: { type: 'string', description: 'YYYY-MM-DD, optional' }, date_to: { type: 'string', description: 'YYYY-MM-DD, optional' } } } } },
+  { type: 'function', function: { name: 'get_all_events', description: 'Get calendar events filtered by date range', parameters: { type: 'object', properties: { date_from: { type: 'string' }, date_to: { type: 'string' } } } } },
+  { type: 'function', function: { name: 'read_board', description: 'Read items from a whiteboard or Me sub-board', parameters: { type: 'object', properties: { scope: { type: 'string', enum: ['whiteboards', 'me'] }, board_id: { type: 'string' } }, required: ['scope', 'board_id'] } } },
   { type: 'function', function: { name: 'update_memories', description: 'Update agent memories with important context', parameters: { type: 'object', properties: { content: { type: 'string' } }, required: ['content'] } } },
   { type: 'function', function: { name: 'generate_image', description: 'Generate image(s) with OpenAI gpt-image-1.5. User will preview before placement. Requires OpenAI key.', parameters: { type: 'object', properties: { prompt: { type: 'string' }, size: { type: 'string', enum: ['1024x1024', '1536x1024', '1024x1536'] }, quality: { type: 'string', enum: ['low', 'medium', 'high', 'auto'] }, n: { type: 'integer', minimum: 1, maximum: 4 }, scope: { type: 'string', enum: ['whiteboards', 'me'] }, board_id: { type: 'string' } }, required: ['prompt'] } } },
   { type: 'function', function: { name: 'generate_images_batch', description: 'Generate multiple images from different prompts. User will preview before placement.', parameters: { type: 'object', properties: { prompts: { type: 'array', items: { type: 'string' } }, size: { type: 'string', enum: ['1024x1024', '1536x1024', '1024x1536'] }, quality: { type: 'string', enum: ['low', 'medium', 'high', 'auto'] }, scope: { type: 'string', enum: ['whiteboards', 'me'] }, board_id: { type: 'string' } }, required: ['prompts'] } } },
+  { type: 'function', function: { name: 'create_artefact', description: 'Create a new HTML or React (JSX) artefact in the Artefacts panel. Use type "html" for plain HTML/CSS/JS and "react" for JSX components (exports a default App component).', parameters: { type: 'object', properties: { title: { type: 'string' }, type: { type: 'string', enum: ['html', 'react'] }, code: { type: 'string', description: 'Full HTML document or React JSX code. For react, write a function App() {} and export it as default or just define it — it will be rendered automatically.' }, artefact_id: { type: 'string', description: 'ID of an existing artefact to update instead of creating new' } }, required: ['title', 'type', 'code'] } } },
 ]
 
 /* ── Context builder ── */
-const genCtx = (sec: Section, notes: Note[], events: CalendarEvent[], tasks: Task[], pom: PomodoroSettings) => {
+const genCtx = (sec: Section, notes: Note[], events: CalendarEvent[], tasks: Task[], pom: PomodoroSettings, artefacts: Artefact[]) => {
   const td = today()
   let c = `# Nucleus — Live Context\nSection: **${sec}** | Today: ${td}\n\n`
   const tt = tasks.filter(t => t.date === td)
   c += `## Today Tasks (${tt.length})\n${tt.map(t => `- [${t.done ? 'x' : ' '}] ${t.text} (id:${t.id})`).join('\n') || '_none_'}\n\n`
   c += `## Notes (${notes.length})\n${notes.slice(0, 15).map(n => `- "${n.title}" id:${n.id} tags:[${(n.tags || []).join(',')}]`).join('\n') || '_none_'}\n\n`
-  const ue = events.filter(e => e.date >= td).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 10)
-  c += `## Upcoming Events\n${ue.map(e => `- ${e.date}${e.time ? ' ' + e.time : ''}: ${e.title} (id:${e.id})`).join('\n') || '_none_'}\n\n`
-  c += `## Pomodoro\nWork: ${pom.work}min | Short: ${pom.short}min | Long: ${pom.long}min\n`
+  const rangeEnd = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const ue = listEventOccurrencesInRange(events, td, rangeEnd, 10)
+  c += `## Upcoming Events\n${ue.map(e => `- ${e.occurrenceDate}${e.time ? ' ' + e.time : ''}: ${e.title} (${recurrenceLabel(e.recurrence)}) (id:${e.id})`).join('\n') || '_none_'}\n\n`
+  c += `## Pomodoro\nWork: ${pom.work}min | Short: ${pom.short}min | Long: ${pom.long}min\n\n`
+  c += `## Artefacts (${artefacts.length})\n${artefacts.slice(0, 10).map(a => `- "${a.title}" (${a.type}) id:${a.id}`).join('\n') || '_none_'}\n`
   return c
 }
 
@@ -57,10 +65,12 @@ interface PendingImg {
 
 interface Props {
   notes: Note[]; events: CalendarEvent[]; tasks: Task[]
+  artefacts: Artefact[]
   section: Section; pomSettings: PomodoroSettings
   setNotes: React.Dispatch<React.SetStateAction<Note[]>>
   setEvents: React.Dispatch<React.SetStateAction<CalendarEvent[]>>
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>
+  setArtefacts: React.Dispatch<React.SetStateAction<Artefact[]>>
   setSection: (s: Section) => void
   setPomSettings: React.Dispatch<React.SetStateAction<PomodoroSettings>>
   agentMd: string; memoriesMd: string
@@ -70,8 +80,8 @@ interface Props {
 }
 
 export default function AIPanel({
-  notes, events, tasks, section, pomSettings,
-  setNotes, setEvents, setTasks, setSection, setPomSettings,
+  notes, events, tasks, artefacts, section, pomSettings,
+  setNotes, setEvents, setTasks, setArtefacts, setSection, setPomSettings,
   agentMd, memoriesMd, setMemoriesMd,
   aiConfig, onClose,
 }: Props) {
@@ -83,13 +93,14 @@ export default function AIPanel({
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null)
   const [pendingImg, setPendingImg] = useState<PendingImg | null>(null)
   const [iterInput, setIterInput] = useState('')
+  const [showCtx, setShowCtx] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const imgMsgIdxRef = useRef<number>(-1)
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs, pendingApproval, pendingImg])
 
-  const ctxText = genCtx(section, notes, events, tasks, pomSettings)
+  const ctxText = genCtx(section, notes, events, tasks, pomSettings, artefacts)
 
   /* ── Permission check ── */
   const needsApproval = (name: string) => {
@@ -170,7 +181,7 @@ export default function AIPanel({
     switch (name) {
       case 'navigate_to': setSection(args.section); return { ok: true }
       case 'create_calendar_event': {
-        const ev: CalendarEvent = { id: uid(), title: args.title, date: args.date, time: args.time || '', color: args.color || '#7c3aed' }
+        const ev: CalendarEvent = { id: uid(), title: args.title, date: args.date, time: args.time || '', color: args.color || '#7c3aed', recurrence: args.recurrence || 'none' }
         setEvents(p => [...p, ev]); return { ok: true, event_id: ev.id }
       }
       case 'set_pomodoro': {
@@ -200,9 +211,54 @@ export default function AIPanel({
         setTasks(p => [t, ...p]); return { ok: true, task_id: t.id }
       }
       case 'get_current_view_content': return { section, content: ctxText }
+      case 'read_note': {
+        const n = notes.find(x => x.id === args.note_id)
+        return n ? { id: n.id, title: n.title, content: n.content, tags: n.tags } : { error: 'Note not found' }
+      }
+      case 'get_all_tasks': {
+        let filtered = tasks
+        if (args.date_from) filtered = filtered.filter(t => t.date >= args.date_from)
+        if (args.date_to) filtered = filtered.filter(t => t.date <= args.date_to)
+        return { tasks: filtered.map(t => ({ id: t.id, text: t.text, done: t.done, date: t.date })) }
+      }
+      case 'get_all_events': {
+        const dateFrom = args.date_from || today()
+        const dateTo = args.date_to || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+        const occurrences = listEventOccurrencesInRange(events, dateFrom, dateTo, 200)
+        return {
+          events: occurrences.map(e => ({
+            id: e.id,
+            title: e.title,
+            date: e.occurrenceDate,
+            time: e.time,
+            color: e.color,
+            recurrence: e.recurrence,
+            series_start: e.date,
+          })),
+        }
+      }
+      case 'read_board': {
+        const board = await store.loadBoard(args.scope as 'whiteboards' | 'me', args.board_id)
+        return board ? { id: board.id, name: board.name, items: board.items } : { error: 'Board not found' }
+      }
       case 'update_memories': setMemoriesMd(args.content); return { ok: true }
       case 'generate_image': return generateAndPreview(args, false)
       case 'generate_images_batch': return generateAndPreview(args, true)
+      case 'create_artefact': {
+        if (args.artefact_id) {
+          let found = false
+          setArtefacts(p => p.map(a => {
+            if (a.id !== args.artefact_id) return a
+            found = true
+            return { ...a, title: args.title ?? a.title, type: args.type ?? a.type, code: args.code, updatedAt: Date.now() }
+          }))
+          if (found) { setSection('artefacts'); return { ok: true, artefact_id: args.artefact_id } }
+        }
+        const a: Artefact = { id: uid(), title: args.title, type: args.type || 'html', code: args.code, createdAt: Date.now(), updatedAt: Date.now() }
+        setArtefacts(p => [a, ...p])
+        setSection('artefacts')
+        return { ok: true, artefact_id: a.id }
+      }
       default: return { error: `Unknown tool: ${name}` }
     }
   }
@@ -266,60 +322,68 @@ export default function AIPanel({
   const hasKey = !!aiConfig.apiKey
 
   return (
-    <div style={{ width: 320, flexShrink: 0, borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: '#09090f' }}>
+    <div style={{ width: 320, flexShrink: 0, borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg-sidebar)' }}>
       {/* Header */}
       <div style={{ padding: '14px 14px 12px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
         <div>
           <div style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.9rem', fontFamily: 'var(--font-heading)' }}>AI Chat</div>
           <div style={{ fontSize: '0.62rem', color: 'var(--text-faint)', marginTop: 1 }}>
-            {hasKey ? aiConfig.model : <span style={{ color: '#7c3a3a' }}>No API key — configure in AI Settings</span>}
+            {hasKey ? aiConfig.model : <span style={{ color: 'var(--red)' }}>No API key — configure in AI Settings</span>}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
           <button onClick={() => setMsgs([])} title="Clear chat" style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: '0.72rem', padding: '3px 6px' }}>Clear</button>
-          <button onClick={() => setSection('ai-settings')} title="AI Settings" style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.7rem', padding: '3px 8px', borderRadius: 6, fontFamily: 'inherit' }}>⚙ Settings</button>
+          <button onClick={() => setShowCtx(v => !v)} style={{ background: showCtx ? 'var(--accent-surface)' : 'none', border: `1px solid ${showCtx ? 'var(--accent)' : 'var(--border)'}`, color: showCtx ? 'var(--accent-light)' : 'var(--text-muted)', cursor: 'pointer', fontSize: '0.7rem', padding: '3px 8px', borderRadius: 6, fontFamily: 'inherit' }}>Context</button>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem', padding: '2px 4px' }}>×</button>
         </div>
       </div>
 
       {/* Permission mode indicator */}
-      <div style={{ padding: '6px 14px', background: '#0a0a14', borderBottom: '1px solid #0e0e1c', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-        <div style={{ width: 6, height: 6, borderRadius: '50%', background: aiConfig.permMode === 'allow' ? 'var(--green)' : aiConfig.permMode === 'ask' ? '#f59e0b' : 'var(--accent)', flexShrink: 0 }} />
+      <div style={{ padding: '6px 14px', background: 'var(--bg-deep)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+        <div style={{ width: 6, height: 6, borderRadius: '50%', background: aiConfig.permMode === 'allow' ? 'var(--green)' : aiConfig.permMode === 'ask' ? 'var(--orange)' : 'var(--accent)', flexShrink: 0 }} />
         <span style={{ fontSize: '0.63rem', color: 'var(--text-faint)' }}>
           {aiConfig.permMode === 'allow' ? 'Auto-execute all' : aiConfig.permMode === 'ask' ? 'Ask for each tool' : 'Custom permissions'}
         </span>
       </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px', position: 'relative' }}>
+        {/* Context overlay */}
+        {showCtx && (
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--bg-sidebar)', zIndex: 10, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 10 }}>Live Context</div>
+            <pre style={{ margin: 0, color: 'var(--text-faint)', fontSize: '0.73rem', fontFamily: 'monospace', lineHeight: 1.75, whiteSpace: 'pre-wrap', wordBreak: 'break-word', flex: 1 }}>{ctxText}</pre>
+            <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border-subtle)' }}>This context is automatically injected into every AI request. Use tools like read_note, get_all_tasks, get_all_events, read_board for full data.</div>
+          </div>
+        )}
         {msgs.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.82rem', marginTop: 44, lineHeight: 1.9, padding: '0 8px' }}>
-            <div style={{ fontSize: '1.6rem', marginBottom: 12, color: '#1e1a35' }}>✦</div>
+            <div style={{ fontSize: '1.6rem', marginBottom: 12, color: 'var(--text-ghost)' }}>✦</div>
             Ask me anything — I can control the app, create content, generate images, and more.
           </div>
         )}
         {msgs.map((m, i) => (
           <div key={i} style={{ marginBottom: 9, display: 'flex', flexDirection: 'column', alignItems: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
             {m.role === 'tool_call' ? (
-              <div style={{ background: '#0e0e1c', border: '1px solid #1a1535', borderRadius: 8, padding: '8px 11px', fontSize: '0.72rem', maxWidth: '95%' }}>
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 11px', fontSize: '0.72rem', maxWidth: '95%' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: m.toolArgs && Object.keys(m.toolArgs).length ? 5 : 0 }}>
                   <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
                   <span style={{ color: 'var(--accent-light)', fontFamily: 'monospace', fontWeight: 700 }}>{m.toolName}()</span>
                 </div>
                 {m.toolArgs && Object.entries(m.toolArgs).slice(0, 4).map(([k, v]) => (
                   <div key={k} style={{ color: 'var(--text-faint)', paddingLeft: 12, lineHeight: 1.6 }}>
-                    <span style={{ color: '#504870' }}>{k}:</span> {String(v).slice(0, 50)}
+                    <span style={{ color: 'var(--text-muted)' }}>{k}:</span> {String(v).slice(0, 50)}
                   </div>
                 ))}
               </div>
             ) : m.role === 'image_preview' ? (
-              <div style={{ background: '#0c0c1e', border: '1px solid #1e1540', borderRadius: 10, padding: 10, maxWidth: '97%', width: '97%' }}>
-                <div style={{ fontSize: '0.68rem', color: '#7060a0', marginBottom: 8, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 10, maxWidth: '97%', width: '97%' }}>
+                <div style={{ fontSize: '0.68rem', color: 'var(--accent-light)', marginBottom: 8, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                   {m.imageStatus === 'inserted' ? '✓ Inserted to board' : m.imageStatus === 'discarded' ? '✕ Discarded' : m.imageStatus === 'iterating' ? '↻ Iterating...' : 'Generated Images'}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 6 }}>
                   {(m.imagePaths || []).map((p, j) => (
-                    <img key={j} src={p} alt={`Generated ${j + 1}`} style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 6, display: 'block', border: '1px solid #1e1540' }} />
+                    <img key={j} src={p} alt={`Generated ${j + 1}`} style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 6, display: 'block', border: '1px solid var(--border)' }} />
                   ))}
                 </div>
               </div>
@@ -349,8 +413,8 @@ export default function AIPanel({
 
       {/* Approval card */}
       {pendingApproval && (
-        <div style={{ margin: '0 10px 8px', background: '#12102a', border: '1px solid #2a1e50', borderRadius: 10, padding: '12px 14px', flexShrink: 0 }}>
-          <div style={{ fontSize: '0.72rem', color: '#a09070', fontWeight: 700, marginBottom: 6, letterSpacing: '0.06em' }}>PERMISSION REQUEST</div>
+        <div style={{ margin: '0 10px 8px', background: 'var(--bg-surface)', border: '1px solid var(--border-focus)', borderRadius: 10, padding: '12px 14px', flexShrink: 0 }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--orange)', fontWeight: 700, marginBottom: 6, letterSpacing: '0.06em' }}>PERMISSION REQUEST</div>
           <div style={{ fontFamily: 'monospace', color: 'var(--accent-light)', fontSize: '0.8rem', marginBottom: 6 }}>{pendingApproval.toolName}()</div>
           {Object.entries(pendingApproval.toolArgs).slice(0, 3).map(([k, v]) => (
             <div key={k} style={{ fontSize: '0.7rem', color: 'var(--text-faint)', paddingLeft: 8, lineHeight: 1.7 }}>
@@ -359,25 +423,25 @@ export default function AIPanel({
           ))}
           <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
             <button onClick={() => pendingApproval.resolve(true)} style={{ flex: 1, padding: '7px', background: 'var(--accent)', border: 'none', borderRadius: 7, color: '#fff', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'inherit' }}>Allow</button>
-            <button onClick={() => pendingApproval.resolve(false)} style={{ flex: 1, padding: '7px', background: 'none', border: '1px solid #2a2040', borderRadius: 7, color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'inherit' }}>Deny</button>
+            <button onClick={() => pendingApproval.resolve(false)} style={{ flex: 1, padding: '7px', background: 'none', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'inherit' }}>Deny</button>
           </div>
         </div>
       )}
 
       {/* Image preview card */}
       {pendingImg && (
-        <div style={{ margin: '0 10px 8px', background: '#0c0c1e', border: '1px solid #1e1540', borderRadius: 10, padding: '12px 14px', flexShrink: 0 }}>
-          <div style={{ fontSize: '0.7rem', color: '#7060a0', fontWeight: 700, marginBottom: 8, letterSpacing: '0.06em' }}>REVIEW GENERATED IMAGES</div>
+        <div style={{ margin: '0 10px 8px', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', flexShrink: 0 }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--accent-light)', fontWeight: 700, marginBottom: 8, letterSpacing: '0.06em' }}>REVIEW GENERATED IMAGES</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 6, marginBottom: 10 }}>
             {pendingImg.paths.map((p, i) => (
-              <img key={i} src={p} alt="" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 6, border: '1px solid #1e1540' }} />
+              <img key={i} src={p} alt="" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />
             ))}
           </div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
             <button onClick={() => pendingImg.resolve('insert')} style={{ flex: 1, padding: '7px', background: 'var(--accent)', border: 'none', borderRadius: 7, color: '#fff', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', fontFamily: 'inherit' }}>
               {pendingImg.args.scope ? 'Insert to Board' : 'Accept'}
             </button>
-            <button onClick={() => pendingImg.resolve('discard')} style={{ padding: '7px 12px', background: 'none', border: '1px solid #2a2040', borderRadius: 7, color: 'var(--text-faint)', fontSize: '0.75rem', cursor: 'pointer', fontFamily: 'inherit' }}>Discard</button>
+            <button onClick={() => pendingImg.resolve('discard')} style={{ padding: '7px 12px', background: 'none', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text-faint)', fontSize: '0.75rem', cursor: 'pointer', fontFamily: 'inherit' }}>Discard</button>
           </div>
           <div style={{ display: 'flex', gap: 5 }}>
             <input
@@ -389,7 +453,7 @@ export default function AIPanel({
             <button
               onClick={() => { if (iterInput.trim()) pendingImg.resolve('iterate', iterInput.trim()) }}
               disabled={!iterInput.trim()}
-              style={{ padding: '6px 10px', background: '#1e1540', border: 'none', borderRadius: 6, color: '#7060a0', fontSize: '0.73rem', cursor: 'pointer', fontFamily: 'inherit', opacity: iterInput.trim() ? 1 : 0.4 }}
+              style={{ padding: '6px 10px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-muted)', fontSize: '0.73rem', cursor: 'pointer', fontFamily: 'inherit', opacity: iterInput.trim() ? 1 : 0.4 }}
             >↻</button>
           </div>
         </div>
@@ -401,7 +465,7 @@ export default function AIPanel({
           {refImages.map((src, i) => (
             <div key={i} style={{ position: 'relative' }}>
               <img src={src} style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />
-              <button onClick={() => setRefImages(p => p.filter((_, j) => j !== i))} style={{ position: 'absolute', top: -4, right: -4, background: '#1a0d20', border: 'none', borderRadius: '50%', width: 14, height: 14, color: '#a0a0c0', fontSize: '0.6rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>×</button>
+              <button onClick={() => setRefImages(p => p.filter((_, j) => j !== i))} style={{ position: 'absolute', top: -4, right: -4, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '50%', width: 14, height: 14, color: 'var(--text-secondary)', fontSize: '0.6rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>×</button>
             </div>
           ))}
         </div>

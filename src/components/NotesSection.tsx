@@ -45,7 +45,7 @@ export default function NotesSection({ notes, setNotes }: Props) {
       {/* Sidebar list */}
       <div style={{
         width: 248, flexShrink: 0, borderRight: '1px solid var(--border)',
-        display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#09090f',
+        display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-sidebar)',
       }}>
         <div style={{ padding: '20px 14px 10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -70,13 +70,13 @@ export default function NotesSection({ notes, setNotes }: Props) {
           <div style={{ padding: '0 14px 10px', display: 'flex', flexWrap: 'wrap', gap: 5 }}>
             <button onClick={() => setFilterTag('')} style={{
               fontSize: '0.68rem', padding: '2px 9px', borderRadius: 20,
-              border: '1px solid #252540', background: !filterTag ? 'var(--accent-surface)' : 'transparent',
+              border: '1px solid var(--border)', background: !filterTag ? 'var(--accent-surface)' : 'transparent',
               color: !filterTag ? 'var(--accent-light)' : 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit',
             }}>All</button>
             {tags.map(t => (
               <button key={t} onClick={() => setFilterTag(filterTag === t ? '' : t)} style={{
                 fontSize: '0.68rem', padding: '2px 9px', borderRadius: 20,
-                border: '1px solid #252540', background: filterTag === t ? 'var(--accent-surface)' : 'transparent',
+                border: '1px solid var(--border)', background: filterTag === t ? 'var(--accent-surface)' : 'transparent',
                 color: filterTag === t ? 'var(--accent-light)' : 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit',
               }}>#{t}</button>
             ))}
@@ -96,7 +96,7 @@ export default function NotesSection({ notes, setNotes }: Props) {
               transition: 'all 0.1s',
             }}>
               <div style={{
-                fontWeight: 600, color: selId === n.id ? '#d4c4ff' : 'var(--text-secondary)',
+                fontWeight: 600, color: selId === n.id ? 'var(--accent-light)' : 'var(--text-secondary)',
                 fontSize: '0.86rem', marginBottom: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}>{n.title || 'Untitled'}</div>
               <div style={{
@@ -105,7 +105,7 @@ export default function NotesSection({ notes, setNotes }: Props) {
               }}>{n.content.replace(/[#*`\-[\]]/g, '').slice(0, 70)}</div>
               {(n.tags || []).length > 0 && (
                 <div style={{ marginTop: 5, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                  {n.tags.map(t => <span key={t} style={{ fontSize: '0.63rem', background: '#1a1035', color: '#7060a0', padding: '1px 7px', borderRadius: 10 }}>#{t}</span>)}
+                  {n.tags.map(t => <span key={t} style={{ fontSize: '0.63rem', background: 'var(--bg-elevated)', color: 'var(--accent-light)', padding: '1px 7px', borderRadius: 10, border: '1px solid var(--border)' }}>#{t}</span>)}
                 </div>
               )}
             </div>
@@ -149,12 +149,12 @@ export default function NotesSection({ notes, setNotes }: Props) {
               <div style={{ display: 'flex', gap: 7, flexShrink: 0 }}>
                 <button onClick={() => setEditMode(!editMode)} style={{
                   background: editMode ? 'var(--accent)' : 'var(--bg-elevated)', border: 'none', borderRadius: 8,
-                  padding: '7px 14px', color: editMode ? '#fff' : '#888898', cursor: 'pointer',
+                  padding: '7px 14px', color: editMode ? '#fff' : 'var(--text-secondary)', cursor: 'pointer',
                   fontSize: '0.78rem', fontWeight: 700, fontFamily: 'inherit',
                 }}>{editMode ? 'Preview' : 'Edit'}</button>
                 <button onClick={() => del(sel.id)} style={{
-                  background: 'none', border: '1px solid #252538', borderRadius: 8,
-                  padding: '7px 10px', color: '#44334a', cursor: 'pointer',
+                  background: 'none', border: '1px solid var(--border)', borderRadius: 8,
+                  padding: '7px 10px', color: 'var(--red)', cursor: 'pointer',
                 }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
@@ -173,7 +173,7 @@ export default function NotesSection({ notes, setNotes }: Props) {
                 }}>
                   #{t}
                   <button onClick={() => upd(sel.id, { tags: sel.tags.filter(x => x !== t) })} style={{
-                    background: 'none', border: 'none', color: '#7060a0', cursor: 'pointer', padding: 0, lineHeight: 1, fontSize: '0.85rem',
+                    background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0, lineHeight: 1, fontSize: '0.85rem',
                   }}>×</button>
                 </span>
               ))}
@@ -181,7 +181,7 @@ export default function NotesSection({ notes, setNotes }: Props) {
                 value={tagInp} onChange={e => setTagInp(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTag()}
                 placeholder="+ tag"
                 style={{
-                  background: 'transparent', border: '1px dashed #252540', borderRadius: 20,
+                  background: 'transparent', border: '1px dashed var(--border)', borderRadius: 20,
                   padding: '3px 10px', color: 'var(--text-muted)', fontSize: '0.72rem', outline: 'none', width: 70, fontFamily: 'inherit',
                 }}
               />

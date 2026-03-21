@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import type { Section, Task, CalendarEvent, Note, PomodoroSettings, AIConfig } from './lib/types'
+import type { Section, Task, CalendarEvent, Note, PomodoroSettings, AIConfig, ThemeSettings, Artefact } from './lib/types'
 import * as store from './lib/storage'
+import { applyTheme, createDefaultThemeSettings, getActiveTheme } from './lib/theme'
 
 import Sidebar from './components/Sidebar'
 import TodaySection from './components/TodaySection'
@@ -11,6 +12,8 @@ import CalendarSection from './components/CalendarSection'
 import PomodoroSection from './components/PomodoroSection'
 import AIPanel from './components/AIPanel'
 import AISettingsSection from './components/AISettingsSection'
+import SettingsSection from './components/SettingsSection'
+import ArtefactsSection from './components/ArtefactsSection'
 
 const DEFAULT_AGENT_MD = `# Nucleus AI Agent
 
@@ -35,12 +38,16 @@ const DEFAULT_MEMORIES_MD = `# Agent Memories
 I update this as I learn about you — preferences, working style, and important context.
 `
 
+const DEFAULT_POMODORO_SETTINGS: PomodoroSettings = { work: 25, short: 5, long: 15, rounds: 4 }
+
 export default function App() {
   const [section, setSection] = useState<Section>('today')
   const [tasks, setTasks] = useState<Task[]>([])
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [notes, setNotes] = useState<Note[]>([])
-  const [pomSettings, setPomSettings] = useState<PomodoroSettings>({ work: 25, short: 5, long: 15 })
+  const [artefacts, setArtefacts] = useState<Artefact[]>([])
+  const [pomSettings, setPomSettings] = useState<PomodoroSettings>(DEFAULT_POMODORO_SETTINGS)
+  const [themeSettings, setThemeSettings] = useState<ThemeSettings>(createDefaultThemeSettings())
   const [aiConfig, setAiConfig] = useState<AIConfig>({ apiKey: '', model: 'stepfun/step-3.5-flash:free', openaiKey: '', permMode: 'allow', permCustom: {} })
   const [agentMd, setAgentMd] = useState(DEFAULT_AGENT_MD)
   const [memoriesMd, setMemoriesMd] = useState(DEFAULT_MEMORIES_MD)
@@ -51,28 +58,35 @@ export default function App() {
   /* ── Load all data on mount ── */
   useEffect(() => {
     (async () => {
-      const [t, e, n, p, cfg, agent, mem] = await Promise.all([
+      const [t, e, n, arts, p, theme, cfg, agent, mem] = await Promise.all([
         store.loadJSON<Task[]>('tasks.json', []),
         store.loadJSON<CalendarEvent[]>('events.json', []),
         store.loadJSON<Note[]>('notes.json', []),
-        store.loadJSON<PomodoroSettings>('pomodoro.json', { work: 25, short: 5, long: 15 }),
+        store.loadJSON<Artefact[]>('artefacts.json', []),
+        store.loadJSON<Partial<PomodoroSettings>>('pomodoro.json', DEFAULT_POMODORO_SETTINGS),
+        store.loadThemeSettings(),
         store.loadAIConfig(),
-        store.loadMD('ai-agent.md', DEFAULT_AGENT_MD),
+        store.loadMD('ai-agent.local.md', '').then(local => local || store.loadMD('ai-agent.md', DEFAULT_AGENT_MD)),
         store.loadMD('ai-memories.md', DEFAULT_MEMORIES_MD),
       ])
-      setTasks(t); setEvents(e); setNotes(n); setPomSettings(p)
+      setTasks(t); setEvents(e); setNotes(n); setArtefacts(arts); setPomSettings({ ...DEFAULT_POMODORO_SETTINGS, ...p })
+      setThemeSettings(theme)
       setAiConfig(cfg); setAgentMd(agent); setMemoriesMd(mem)
       setReady(true)
     })()
   }, [])
 
   /* ── Auto-save on state change ── */
+  useEffect(() => { if (ready) store.saveJSON('artefacts.json', artefacts) }, [artefacts, ready])
   useEffect(() => { if (ready) store.saveJSON('tasks.json', tasks) }, [tasks, ready])
   useEffect(() => { if (ready) store.saveJSON('events.json', events) }, [events, ready])
   useEffect(() => { if (ready) store.saveJSON('notes.json', notes) }, [notes, ready])
   useEffect(() => { if (ready) store.saveJSON('pomodoro.json', pomSettings) }, [pomSettings, ready])
-  useEffect(() => { if (ready) store.saveMD('ai-agent.md', agentMd) }, [agentMd, ready])
+  useEffect(() => { if (ready) store.saveThemeSettings(themeSettings) }, [themeSettings, ready])
+  useEffect(() => { if (ready) store.saveAIConfig(aiConfig) }, [aiConfig, ready])
+  useEffect(() => { if (ready) store.saveMD('ai-agent.local.md', agentMd) }, [agentMd, ready])
   useEffect(() => { if (ready) store.saveMD('ai-memories.md', memoriesMd) }, [memoriesMd, ready])
+  useEffect(() => { applyTheme(getActiveTheme(themeSettings)) }, [themeSettings])
 
   /* ── Loading screen ── */
   if (!ready) return (
@@ -108,6 +122,14 @@ export default function App() {
             <PomodoroSection settings={pomSettings} setSettings={setPomSettings} />
           </div>
         )}
+        {section === 'artefacts' && (
+          <ArtefactsSection artefacts={artefacts} setArtefacts={setArtefacts} />
+        )}
+        {section === 'settings' && (
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            <SettingsSection themeSettings={themeSettings} setThemeSettings={setThemeSettings} />
+          </div>
+        )}
         {section === 'ai-settings' && (
           <div style={{ flex: 1, overflowY: 'auto' }}>
             <AISettingsSection
@@ -125,6 +147,7 @@ export default function App() {
       {aiOpen && (
         <AIPanel
           notes={notes} events={events} tasks={tasks}
+          artefacts={artefacts} setArtefacts={setArtefacts}
           section={section} pomSettings={pomSettings}
           setNotes={setNotes} setEvents={setEvents} setTasks={setTasks}
           setSection={setSection} setPomSettings={setPomSettings}

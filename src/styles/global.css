@@ -11,6 +11,8 @@
   --bg-surface: #0f0f1c;
   --bg-elevated: #111120;
   --bg-input: #0d0d18;
+  --board-bg: #0a0a12;
+  --board-grid: #1c1c2e;
   --border: #1a1a28;
   --border-subtle: #141422;
   --border-focus: #2d1f5e;
@@ -46,6 +48,10 @@ html, body, #root {
   font-family: var(--font);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
+}
+
+body {
+  transition: background 0.18s ease, color 0.18s ease;
 }
 
 /* ── Scrollbars ── */

@@ -145,7 +145,7 @@ export default function AISettingsSection({
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
           {agEdit ? (
             <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={() => { setAgentMd(agBuf); setAgEdit(false); store.saveMD('ai-agent.md', agBuf) }} style={saveBtn}>Save</button>
+              <button onClick={() => { setAgentMd(agBuf); setAgEdit(false); store.saveMD('ai-agent.local.md', agBuf) }} style={saveBtn}>Save</button>
               <button onClick={() => { setAgBuf(agentMd); setAgEdit(false) }} style={cancelBtn}>Cancel</button>
             </div>
           ) : <button onClick={() => { setAgBuf(agentMd); setAgEdit(true) }} style={editBtn}>Edit</button>}

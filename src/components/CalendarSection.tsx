@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import type { CalendarEvent } from '../lib/types'
+import type { CalendarEvent, EventRecurrence } from '../lib/types'
 import { uid, today, fmtDate, EVENT_PALETTE } from '../lib/helpers'
+import { listEventOccurrencesForDate, recurrenceLabel } from '../lib/calendar'
 
 interface Props {
   events: CalendarEvent[]
@@ -10,27 +11,27 @@ interface Props {
 export default function CalendarSection({ events, setEvents }: Props) {
   const [vd, setVd] = useState(new Date())
   const [selDay, setSelDay] = useState<number | null>(null)
-  const [nev, setNev] = useState({ title: '', time: '', color: '#7c3aed' })
+  const [nev, setNev] = useState<{ title: string; time: string; color: string; recurrence: EventRecurrence }>({ title: '', time: '', color: '#7c3aed', recurrence: 'none' })
   const [dragId, setDragId] = useState<string | null>(null)
 
   const yr = vd.getFullYear(), mo = vd.getMonth()
   const firstDow = new Date(yr, mo, 1).getDay()
   const daysInMo = new Date(yr, mo + 1, 0).getDate()
   const dk = (d: number) => `${yr}-${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-  const dayEvs = (d: number) => events.filter(e => e.date === dk(d))
+  const dayEvs = (d: number) => listEventOccurrencesForDate(events, dk(d))
   const isToday = (d: number) => dk(d) === today()
 
   const addEv = () => {
     if (!nev.title.trim() || !selDay) return
     setEvents(p => [...p, { id: uid(), ...nev, date: dk(selDay) }])
-    setNev({ title: '', time: '', color: '#7c3aed' })
+    setNev({ title: '', time: '', color: '#7c3aed', recurrence: 'none' })
   }
 
   const cells: (number | null)[] = []
   for (let i = 0; i < firstDow; i++) cells.push(null)
   for (let i = 1; i <= daysInMo; i++) cells.push(i)
 
-  const selEvs = selDay ? events.filter(e => e.date === dk(selDay)).sort((a, b) => (a.time || '').localeCompare(b.time || '')) : []
+  const selEvs = selDay ? listEventOccurrencesForDate(events, dk(selDay)) : []
 
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -82,13 +83,13 @@ export default function CalendarSection({ events, setEvents }: Props) {
                   }}>{d}</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {dayEvs(d).slice(0, 3).map(ev => (
-                      <div key={ev.id} draggable onDragStart={() => setDragId(ev.id)} style={{
+                      <div key={`${ev.id}-${ev.occurrenceDate}`} draggable onDragStart={() => setDragId(ev.id)} style={{
                         fontSize: '0.65rem', background: ev.color + '28',
                         borderLeft: `2px solid ${ev.color}`, color: ev.color,
                         borderRadius: '0 3px 3px 0', padding: '2px 5px',
                         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'grab',
                         fontWeight: 500,
-                      }}>{ev.time ? `${ev.time} ` : ''}{ev.title}</div>
+                      }}>{ev.recurrence !== 'none' ? '↻ ' : ''}{ev.time ? `${ev.time} ` : ''}{ev.title}</div>
                     ))}
                     {dayEvs(d).length > 3 && <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', paddingLeft: 5 }}>+{dayEvs(d).length - 3} more</div>}
                   </div>
@@ -107,7 +108,7 @@ export default function CalendarSection({ events, setEvents }: Props) {
       {selDay && (
         <div style={{
           width: 252, borderLeft: '1px solid var(--border)', padding: '22px 16px',
-          overflow: 'auto', flexShrink: 0, background: '#09090f',
+          overflow: 'auto', flexShrink: 0, background: 'var(--bg-sidebar)',
         }}>
           <div style={{ fontWeight: 800, color: 'var(--text-secondary)', marginBottom: 16, fontSize: '0.9rem', fontFamily: 'var(--font-heading)' }}>
             {fmtDate(dk(selDay))}
@@ -121,6 +122,16 @@ export default function CalendarSection({ events, setEvents }: Props) {
             <input value={nev.time} onChange={e => setNev(p => ({ ...p, time: e.target.value }))}
               placeholder="Time (14:30)"
               style={{ ...inputStyle, marginBottom: 9 }} />
+            <select
+              value={nev.recurrence}
+              onChange={e => setNev(p => ({ ...p, recurrence: e.target.value as EventRecurrence }))}
+              style={{ ...inputStyle, marginBottom: 9, appearance: 'none' }}
+            >
+              <option value="none">One time</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="yearly">Yearly</option>
+            </select>
             <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
               {EVENT_PALETTE.map(c => (
                 <button key={c} onClick={() => setNev(p => ({ ...p, color: c }))} style={{
@@ -149,6 +160,7 @@ export default function CalendarSection({ events, setEvents }: Props) {
                 <div>
                   <div style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', fontWeight: 600 }}>{ev.title}</div>
                   {ev.time && <div style={{ color: 'var(--text-muted)', fontSize: '0.73rem', marginTop: 2 }}>{ev.time}</div>}
+                  {ev.recurrence !== 'none' && <div style={{ color: 'var(--accent-light)', fontSize: '0.7rem', marginTop: 2 }}>{recurrenceLabel(ev.recurrence)}</div>}
                 </div>
                 <button onClick={() => setEvents(p => p.filter(e => e.id !== ev.id))} style={{
                   background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: '1rem', padding: 0,

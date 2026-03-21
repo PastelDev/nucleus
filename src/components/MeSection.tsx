@@ -1,5 +1,9 @@
 import WhiteboardEngine from './WhiteboardEngine'
 
 export default function MeSection() {
-  return <WhiteboardEngine scope="me" title="Me" />
+  return (
+    <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex' }}>
+      <WhiteboardEngine scope="me" title="Me" />
+    </div>
+  )
 }

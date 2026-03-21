@@ -53,7 +53,8 @@ export async function saveMD(filename: string, content: string): Promise<void> {
 
 /* ── Board operations ── */
 
-import type { BoardIndex, Board, WBItem } from './types'
+import type { BoardIndex, Board, ThemeSettings } from './types'
+import { createDefaultThemeSettings, normalizeThemeSettings } from './theme'
 
 export async function loadBoardIndex(scope: 'whiteboards' | 'me'): Promise<BoardIndex> {
   return loadJSON<BoardIndex>(`${scope}/index.json`, { boards: [] })
@@ -110,4 +111,13 @@ export async function loadAIConfig(): Promise<import('./types').AIConfig> {
 
 export async function saveAIConfig(config: import('./types').AIConfig): Promise<void> {
   return saveJSON('config.json', config)
+}
+
+export async function loadThemeSettings(): Promise<ThemeSettings> {
+  const raw = await loadJSON<ThemeSettings>('theme-settings.json', createDefaultThemeSettings())
+  return normalizeThemeSettings(raw)
+}
+
+export async function saveThemeSettings(settings: ThemeSettings): Promise<void> {
+  return saveJSON('theme-settings.json', settings)
 }

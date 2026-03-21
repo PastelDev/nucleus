@@ -1,0 +1,7 @@
+{
+  "apiKey": "your-openrouter-api-key",
+  "model": "stepfun/step-3.5-flash:free",
+  "permMode": "allow",
+  "permCustom": {},
+  "openaiKey": ""
+}

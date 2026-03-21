@@ -10,10 +10,79 @@ export const fmtDate = (d: string): string =>
   })
 
 export const greeting = (): string => {
-  const h = new Date().getHours()
-  if (h < 12) return 'Good morning'
-  if (h < 17) return 'Good afternoon'
-  return 'Good evening'
+  const now = new Date()
+  const h = now.getHours()
+  const day = now.getDay() // 0=Sun, 1=Mon, ..., 6=Sat
+  const seed = now.getDate() + now.getMonth() * 31 // changes daily
+
+  let pool: string[]
+
+  if (h >= 0 && h < 6) {
+    // Late night
+    pool = [
+      "What's on your mind tonight?",
+      'Hello, night owl',
+      "How's it going?",
+      'Still going strong?',
+      'Up late again?',
+      'Good to see you',
+    ]
+  } else if (h < 12) {
+    // Morning
+    const daySpecific: Record<number, string[]> = {
+      1: ['Happy Monday', "New week, let's go"],
+      2: ['Happy Tuesday'],
+      3: ['Happy Wednesday', 'Halfway through the week'],
+      4: ['Happy Thursday', 'Almost there'],
+      5: ['Happy Friday', 'That Friday feeling'],
+      6: ['Happy Saturday', 'Welcome to the weekend', "What's on your mind?"],
+      0: ['Happy Sunday', 'Sunday session?', 'Welcome to the weekend'],
+    }
+    pool = [
+      'Good morning',
+      'Welcome back',
+      'Hey there',
+      'Coffee and focus time?',
+      "What's on your list today?",
+      'Ready to get things done?',
+      ...(daySpecific[day] || []),
+    ]
+  } else if (h < 17) {
+    // Afternoon
+    pool = [
+      'Good afternoon',
+      'Back at it',
+      "What's new?",
+      'How is the day going?',
+      'Afternoon check-in',
+      "What's on your list?",
+      'Making progress?',
+      'Hi, how are you?',
+    ]
+  } else if (h < 21) {
+    // Evening
+    pool = [
+      'Good evening',
+      'Evening',
+      'How was your day?',
+      'Winding down?',
+      'End-of-day review?',
+      "What's left on the list?",
+      'returns!',
+    ]
+  } else {
+    // Late evening (9pm–midnight)
+    pool = [
+      "What's on your mind tonight?",
+      'Hello, night owl',
+      'Still going?',
+      'Evening wind-down?',
+      'One more thing before bed?',
+      'Good to see you',
+    ]
+  }
+
+  return pool[seed % pool.length]
 }
 
 export const QUOTES = [

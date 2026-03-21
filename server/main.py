@@ -195,6 +195,7 @@ async def init_data():
         "tasks.json": "[]",
         "events.json": "[]",
         "notes.json": "[]",
+        "artefacts.json": "[]",
         "pomodoro.json": '{"work": 25, "short": 5, "long": 15}',
         "config.json": '{"apiKey": "", "model": "stepfun/step-3.5-flash:free", "openaiKey": ""}',
         "ai-agent.md": DEFAULT_AGENT_MD,

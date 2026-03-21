@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { Task, CalendarEvent, Section } from '../lib/types'
 import { uid, today, greeting } from '../lib/helpers'
+import { listEventOccurrencesForDate, recurrenceLabel } from '../lib/calendar'
 
 interface Props {
   tasks: Task[]
@@ -24,7 +25,7 @@ export default function TodaySection({ tasks, setTasks, events, setSection }: Pr
   const [apodExpanded, setApodExpanded] = useState(false)
   const td = today()
   const todayTasks = tasks.filter(t => t.date === td)
-  const todayEvents = events.filter(e => e.date === td).sort((a, b) => (a.time || '').localeCompare(b.time || ''))
+  const todayEvents = listEventOccurrencesForDate(events, td)
   const done = todayTasks.filter(t => t.done).length
 
   useEffect(() => {
@@ -51,7 +52,7 @@ export default function TodaySection({ tasks, setTasks, events, setSection }: Pr
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
         </div>
         <h1 style={{ fontSize: '2.4rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.035em', fontFamily: 'var(--font-heading)' }}>
-          {greeting()}, Stelios
+          {greeting()}
         </h1>
       </div>
 
@@ -168,7 +169,10 @@ export default function TodaySection({ tasks, setTasks, events, setSection }: Pr
               marginBottom: 5, cursor: 'pointer',
             }}>
               {ev.time && <span style={{ color: '#606080', fontSize: '0.78rem', fontWeight: 600, minWidth: 40 }}>{ev.time}</span>}
-              <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{ev.title}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{ev.title}</span>
+                {ev.recurrence !== 'none' && <span style={{ color: 'var(--accent-light)', fontSize: '0.68rem' }}>{recurrenceLabel(ev.recurrence)}</span>}
+              </div>
             </div>
           ))
         )}
