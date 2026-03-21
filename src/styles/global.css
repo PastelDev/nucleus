@@ -1,0 +1,77 @@
+/* ── Reset & base ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg-deep: #0a0a12;
+  --bg-sidebar: #07070e;
+  --bg-surface: #0f0f1c;
+  --bg-elevated: #111120;
+  --bg-input: #0d0d18;
+  --border: #1a1a28;
+  --border-subtle: #141422;
+  --border-focus: #2d1f5e;
+  --text-primary: #eeeefa;
+  --text-secondary: #c4c4dc;
+  --text-muted: #505070;
+  --text-faint: #303050;
+  --text-ghost: #1e1e2e;
+  --accent: #7c3aed;
+  --accent-light: #a78bfa;
+  --accent-surface: #160e2e;
+  --accent-glow: rgba(124, 58, 237, 0.25);
+  --green: #059669;
+  --blue: #2563eb;
+  --red: #dc2626;
+  --orange: #d97706;
+  --pink: #db2777;
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+  --shadow: 0 2px 8px rgba(0,0,0,0.3);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,0.4);
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Courier New', monospace;
+}
+
+html, body, #root {
+  height: 100%;
+  background: var(--bg-deep);
+  font-family: var(--font);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbars ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #222238; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #333350; }
+
+/* ── Form resets ── */
+input::placeholder, textarea::placeholder { color: var(--text-faint) !important; }
+button:focus { outline: none; }
+input[type=number]::-webkit-inner-spin-button { opacity: 0.3; }
+
+/* ── Animations ── */
+@keyframes nuc-pulse {
+  0%, 100% { opacity: 0.2; transform: scale(0.75); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes nuc-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes nuc-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.nuc-section { animation: nuc-fade-in 0.18s ease; }

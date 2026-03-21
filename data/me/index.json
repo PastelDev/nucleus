@@ -1,0 +1,28 @@
+{
+  "boards": [
+    {
+      "id": "physics-math",
+      "name": "Physics & Math"
+    },
+    {
+      "id": "school",
+      "name": "School"
+    },
+    {
+      "id": "reading",
+      "name": "Reading"
+    },
+    {
+      "id": "projects",
+      "name": "Projects"
+    },
+    {
+      "id": "sleep-routine",
+      "name": "Sleep & Routine"
+    },
+    {
+      "id": "home-time",
+      "name": "Home Time"
+    }
+  ]
+}

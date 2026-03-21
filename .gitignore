@@ -1,0 +1,22 @@
+node_modules/
+dist/
+.vite/
+
+# Runtime data (API key etc)
+data/config.json
+data/whiteboards/*/assets/
+data/me/*/assets/
+
+# Python
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
