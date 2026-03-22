@@ -121,3 +121,13 @@ export async function loadThemeSettings(): Promise<ThemeSettings> {
 export async function saveThemeSettings(settings: ThemeSettings): Promise<void> {
   return saveJSON('theme-settings.json', settings)
 }
+
+/* ── AI chat history ── */
+
+export async function loadChats<T>(): Promise<T[]> {
+  return loadJSON<T[]>('ai-chats.json', [])
+}
+
+export async function saveChats<T>(sessions: T[]): Promise<void> {
+  return saveJSON('ai-chats.json', sessions)
+}

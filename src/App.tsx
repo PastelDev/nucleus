@@ -51,6 +51,8 @@ export default function App() {
   const [aiConfig, setAiConfig] = useState<AIConfig>({ apiKey: '', model: 'stepfun/step-3.5-flash:free', openaiKey: '', permMode: 'allow', permCustom: {} })
   const [agentMd, setAgentMd] = useState(DEFAULT_AGENT_MD)
   const [memoriesMd, setMemoriesMd] = useState(DEFAULT_MEMORIES_MD)
+  const [focusTopic, setFocusTopic] = useState('')
+  const [preventSleep, setPreventSleep] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [ready, setReady] = useState(false)
@@ -118,8 +120,8 @@ export default function App() {
         {section === 'me' && <MeSection />}
         {section === 'calendar' && <CalendarSection events={events} setEvents={setEvents} />}
         {section === 'pomodoro' && (
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            <PomodoroSection settings={pomSettings} setSettings={setPomSettings} />
+          <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
+            <PomodoroSection settings={pomSettings} setSettings={setPomSettings} focusTopic={focusTopic} setFocusTopic={setFocusTopic} preventSleep={preventSleep} setPreventSleep={setPreventSleep} />
           </div>
         )}
         {section === 'artefacts' && (
@@ -153,6 +155,8 @@ export default function App() {
           setSection={setSection} setPomSettings={setPomSettings}
           agentMd={agentMd} memoriesMd={memoriesMd} setMemoriesMd={setMemoriesMd}
           aiConfig={aiConfig}
+          focusTopic={focusTopic} setFocusTopic={setFocusTopic}
+          preventSleep={preventSleep} setPreventSleep={setPreventSleep}
           onClose={() => setAiOpen(false)}
         />
       )}

@@ -30,11 +30,13 @@ export default function TodaySection({ tasks, setTasks, events, setSection }: Pr
 
   useEffect(() => {
     const cacheKey = 'nucleus-apod-' + new Date().toISOString().slice(0, 10)
-    const cached = sessionStorage.getItem(cacheKey)
+    const cached = localStorage.getItem(cacheKey)
     if (cached) { setApod(JSON.parse(cached)); return }
+    // Clean up old cached keys
+    Object.keys(localStorage).filter(k => k.startsWith('nucleus-apod-') && k !== cacheKey).forEach(k => localStorage.removeItem(k))
     fetch('https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY')
       .then(r => r.json())
-      .then(d => { setApod(d); sessionStorage.setItem(cacheKey, JSON.stringify(d)) })
+      .then(d => { setApod(d); localStorage.setItem(cacheKey, JSON.stringify(d)) })
       .catch(() => {})
   }, [])
 

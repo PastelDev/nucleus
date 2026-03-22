@@ -235,6 +235,44 @@ export default function ArtefactsSection({ artefacts, setArtefacts }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const preRef = useRef<HTMLPreElement>(null)
 
+  // Resizable sidebar
+  const [sbW, setSbW] = useState(() => {
+    const s = localStorage.getItem('nucleus-art-sb-w')
+    const def = Math.min(260, Math.max(180, Math.round(window.innerWidth * 0.15)))
+    return s ? Math.max(160, Math.min(420, Number(s))) : def
+  })
+  const [sbCollapsed, setSbCollapsed] = useState(() => localStorage.getItem('nucleus-art-sb-col') === '1')
+  const [dragHov, setDragHov] = useState(false)
+  const sbDragging = useRef(false)
+  const sbDragStart = useRef({ x: 0, w: 0 })
+  const latestSbW = useRef(sbW)
+
+  const startSbDrag = (e: { preventDefault(): void; clientX: number }) => {
+    e.preventDefault()
+    sbDragging.current = true
+    sbDragStart.current = { x: e.clientX, w: sbW }
+    const onMove = (ev: MouseEvent) => {
+      if (!sbDragging.current) return
+      const nw = Math.max(160, Math.min(420, sbDragStart.current.w + ev.clientX - sbDragStart.current.x))
+      latestSbW.current = nw
+      setSbW(nw)
+    }
+    const onUp = () => {
+      sbDragging.current = false
+      localStorage.setItem('nucleus-art-sb-w', String(latestSbW.current))
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
+  const toggleSb = () => {
+    const next = !sbCollapsed
+    setSbCollapsed(next)
+    localStorage.setItem('nucleus-art-sb-col', next ? '1' : '0')
+  }
+
   const sel = artefacts.find(a => a.id === selected) ?? null
 
   useEffect(() => {
@@ -313,13 +351,32 @@ export default function ArtefactsSection({ artefacts, setArtefacts }: Props) {
     <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
       {/* ── Left sidebar ── */}
       <div style={{
-        width: 220, flexShrink: 0,
+        width: sbCollapsed ? 32 : sbW, flexShrink: 0,
         borderRight: '1px solid var(--border-subtle)',
         display: 'flex', flexDirection: 'column',
         background: 'var(--bg-sidebar)', overflow: 'hidden',
+        position: 'relative', transition: sbDragging.current ? 'none' : 'width 0.15s',
       }}>
+        {/* Collapse toggle */}
+        <button
+          onClick={toggleSb}
+          title={sbCollapsed ? 'Expand' : 'Collapse'}
+          style={{
+            position: 'absolute', top: 8, right: 6, zIndex: 20,
+            width: 20, height: 20, borderRadius: 4, border: 'none',
+            background: 'transparent', color: 'var(--text-faint)',
+            cursor: 'pointer', fontSize: '0.8rem', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', padding: 0,
+            flexShrink: 0,
+          }}
+        >
+          {sbCollapsed ? '›' : '‹'}
+        </button>
+
+        {!sbCollapsed && (
+          <>
         <div style={{ padding: '18px 14px 10px', borderBottom: '1px solid var(--border-subtle)' }}>
-          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 10 }}>
+          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 10, paddingRight: 24 }}>
             Artefacts
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
@@ -363,10 +420,9 @@ export default function ArtefactsSection({ artefacts, setArtefacts }: Props) {
               ) : (
                 <button
                   onClick={() => setSelected(a.id)}
-                  onDoubleClick={() => { setSelected(a.id); setRenamingId(a.id); setRenameDraft(a.title) }}
                   style={{
                     width: '100%', textAlign: 'left', padding: '7px 10px',
-                    paddingRight: hoveredId === a.id ? 30 : 10,
+                    paddingRight: hoveredId === a.id ? 56 : 10,
                     borderRadius: 7, border: 'none',
                     background: selected === a.id ? 'var(--accent-surface)' : 'transparent',
                     color: selected === a.id ? 'var(--accent-light)' : 'var(--text-secondary)',
@@ -388,25 +444,48 @@ export default function ArtefactsSection({ artefacts, setArtefacts }: Props) {
                 </button>
               )}
 
-              {/* Delete on hover */}
+              {/* Rename + Delete on hover */}
               {hoveredId === a.id && renamingId !== a.id && (
-                <button
-                  onClick={e => { e.stopPropagation(); deleteArtefact(a.id) }}
-                  title="Delete"
-                  style={{
-                    position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)',
-                    width: 20, height: 20, borderRadius: 4, border: 'none',
-                    background: 'var(--bg-elevated)', color: 'var(--red)',
-                    cursor: 'pointer', fontSize: '0.7rem', display: 'flex',
-                    alignItems: 'center', justifyContent: 'center', padding: 0,
-                  }}
-                >
-                  ✕
-                </button>
+                <div style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: 2 }}>
+                  <button
+                    onClick={e => { e.stopPropagation(); setSelected(a.id); setRenamingId(a.id); setRenameDraft(a.title) }}
+                    title="Rename"
+                    style={{ width: 22, height: 22, borderRadius: 4, border: 'none', background: 'var(--bg-elevated)', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); deleteArtefact(a.id) }}
+                    title="Delete"
+                    style={{ width: 22, height: 22, borderRadius: 4, border: 'none', background: 'var(--bg-elevated)', color: 'var(--red)', cursor: 'pointer', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+                  >
+                    ✕
+                  </button>
+                </div>
               )}
             </div>
           ))}
         </div>
+          </>
+        )}
+
+        {/* Drag handle */}
+        {!sbCollapsed && (
+          <div
+            onMouseDown={startSbDrag}
+            onMouseEnter={() => setDragHov(true)}
+            onMouseLeave={() => setDragHov(false)}
+            style={{
+              position: 'absolute', right: 0, top: 0, bottom: 0, width: 4,
+              cursor: 'col-resize', zIndex: 10,
+              background: dragHov ? 'var(--accent)' : 'transparent',
+              transition: 'background 0.15s',
+            }}
+          />
+        )}
       </div>
 
       {/* ── Right panel ── */}

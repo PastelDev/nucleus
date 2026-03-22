@@ -138,6 +138,28 @@ async def generate_image(request: Request):
     board_id = body.get("board_id")
     size = body.get("size", "1024x1024")
     quality = body.get("quality", "auto")
+    reference_paths = body.get("reference_paths", [])
+    reference_base64_images = body.get("reference_base64_images", [])
+
+    # Resolve reference image bytes (first one wins)
+    ref_bytes: bytes | None = None
+    if reference_paths:
+        ref_path_str = reference_paths[0]
+        # strip leading /api/data/ or /api/assets/ to get a local path
+        if ref_path_str.startswith("/api/data/"):
+            local = DATA_DIR / ref_path_str[len("/api/data/"):]
+        elif ref_path_str.startswith("/api/assets/"):
+            parts = ref_path_str[len("/api/assets/"):].split("/", 2)
+            if len(parts) == 3:
+                local = DATA_DIR / parts[0] / parts[1] / "assets" / parts[2]
+            else:
+                local = None
+        else:
+            local = None
+        if local and local.exists():
+            ref_bytes = local.read_bytes()
+    elif reference_base64_images:
+        ref_bytes = base64.b64decode(reference_base64_images[0])
 
     # batch = list of different prompts; single = one prompt with optional n
     prompts_list = body.get("prompts")
@@ -147,18 +169,32 @@ async def generate_image(request: Request):
         jobs = [(body.get("prompt", ""), body.get("n", 1))]
 
     paths = []
+    b64_images = []
     async with httpx.AsyncClient(timeout=180) as client:
         for prompt, n in jobs:
-            resp = await client.post(
-                "https://api.openai.com/v1/images/generations",
-                headers={"Authorization": f"Bearer {openai_key}", "Content-Type": "application/json"},
-                json={"model": "gpt-image-1.5", "prompt": prompt, "size": size, "quality": quality, "n": n},
-            )
+            if ref_bytes:
+                # Use images/edits endpoint with reference image
+                import io as _io
+                files = {"image": ("reference.png", _io.BytesIO(ref_bytes), "image/png")}
+                data_fields = {"model": "gpt-image-1", "prompt": prompt, "n": str(n), "size": size}
+                resp = await client.post(
+                    "https://api.openai.com/v1/images/edits",
+                    headers={"Authorization": f"Bearer {openai_key}"},
+                    files=files,
+                    data=data_fields,
+                )
+            else:
+                resp = await client.post(
+                    "https://api.openai.com/v1/images/generations",
+                    headers={"Authorization": f"Bearer {openai_key}", "Content-Type": "application/json"},
+                    json={"model": "gpt-image-1", "prompt": prompt, "size": size, "quality": quality, "n": n},
+                )
             data = resp.json()
             if "error" in data:
                 return JSONResponse({"error": data["error"]["message"]}, status_code=400)
             for img in data.get("data", []):
                 img_bytes = base64.b64decode(img["b64_json"])
+                b64_images.append(img["b64_json"])
                 fname = f"ai_{int(time.time() * 1000)}.png"
                 if scope and board_id:
                     assets_dir = DATA_DIR / scope / board_id / "assets"
@@ -171,7 +207,24 @@ async def generate_image(request: Request):
                     (out_dir / fname).write_bytes(img_bytes)
                     paths.append(f"/api/data/generated/{fname}")
 
-    return JSONResponse({"paths": paths})
+    return JSONResponse({"paths": paths, "b64_images": b64_images})
+
+
+# ── Screenshot ───────────────────────────────────────────────────────────────
+
+@app.get("/api/screenshot")
+async def screenshot():
+    from PIL import ImageGrab
+    import io
+    img = ImageGrab.grab(all_screens=True)
+    max_width = 1920
+    if img.width > max_width:
+        ratio = max_width / img.width
+        img = img.resize((max_width, int(img.height * ratio)))
+    buf = io.BytesIO()
+    img.convert("RGB").save(buf, format="JPEG", quality=85)
+    b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+    return JSONResponse({"b64": b64})
 
 
 # ── Delete board ─────────────────────────────────────────────────────────────

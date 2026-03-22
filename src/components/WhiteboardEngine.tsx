@@ -81,8 +81,47 @@ export default function WhiteboardEngine({ scope, title }: Props) {
   const [newBoardName, setNewBoardName] = useState('')
   const [renameBoardId, setRenameBoardId] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
+  const renameInputRef = useRef<HTMLInputElement>(null)
   const [historyList, setHistoryList] = useState<string[]>([])
   const [showHistory, setShowHistory] = useState(false)
+
+  const lsKey = `nucleus-wb-sb-${scope}`
+  const [sbW, setSbW] = useState(() => {
+    const s = localStorage.getItem(`${lsKey}-w`)
+    const def = Math.min(280, Math.max(180, Math.round(window.innerWidth * 0.15)))
+    return s ? Math.max(160, Math.min(420, Number(s))) : def
+  })
+  const [sbCollapsed, setSbCollapsed] = useState(() => localStorage.getItem(`${lsKey}-col`) === '1')
+  const [sbDragHov, setSbDragHov] = useState(false)
+  const sbDragging = useRef(false)
+  const sbDragStart = useRef({ x: 0, w: 0 })
+  const latestSbW = useRef(sbW)
+
+  const startSbDrag = (e: { preventDefault(): void; clientX: number }) => {
+    e.preventDefault()
+    sbDragging.current = true
+    sbDragStart.current = { x: e.clientX, w: sbW }
+    const onMove = (ev: MouseEvent) => {
+      if (!sbDragging.current) return
+      const nw = Math.max(160, Math.min(420, sbDragStart.current.w + ev.clientX - sbDragStart.current.x))
+      latestSbW.current = nw
+      setSbW(nw)
+    }
+    const onUp = () => {
+      sbDragging.current = false
+      localStorage.setItem(`${lsKey}-w`, String(latestSbW.current))
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
+
+  const toggleSb = () => {
+    const next = !sbCollapsed
+    setSbCollapsed(next)
+    localStorage.setItem(`${lsKey}-col`, next ? '1' : '0')
+  }
 
   const viewRef = useRef<HTMLDivElement>(null)
   const toolbarRef = useRef<HTMLDivElement>(null)
@@ -91,6 +130,7 @@ export default function WhiteboardEngine({ scope, title }: Props) {
   const gestureSnapshotRef = useRef<WBItem[] | null>(null)
   const textEditHistoryRef = useRef<string | null>(null)
   const imgInputRef = useRef<HTMLInputElement>(null)
+  const [hoveredBoardId, setHoveredBoardId] = useState<string | null>(null)
 
   const [pan, setPan] = useState({ x: 80, y: 80 })
   const [zoom, setZoom] = useState(1)
@@ -122,6 +162,10 @@ export default function WhiteboardEngine({ scope, title }: Props) {
     setUndoStack((current) => [...current.slice(-49), cloneItems(snapshot)])
     setRedoStack([])
   }, [])
+
+  useEffect(() => {
+    if (renameBoardId) requestAnimationFrame(() => renameInputRef.current?.focus())
+  }, [renameBoardId])
 
   const beginGestureHistory = useCallback((snapshot = itemsRef.current) => {
     gestureSnapshotRef.current = cloneItems(snapshot)
@@ -656,7 +700,8 @@ export default function WhiteboardEngine({ scope, title }: Props) {
     return (
       <div key={board.id}>
         <div
-          onClick={() => setActiveBoardId(board.id)}
+          onMouseEnter={() => setHoveredBoardId(board.id)}
+          onMouseLeave={() => setHoveredBoardId(null)}
           style={{
             ...boardRow,
             padding: nested ? '6px 10px 6px 24px' : '8px 10px',
@@ -667,7 +712,7 @@ export default function WhiteboardEngine({ scope, title }: Props) {
         >
           {renaming ? (
             <input
-              autoFocus
+              ref={renameInputRef}
               value={renameDraft}
               onChange={(event) => setRenameDraft(event.target.value)}
               onBlur={() => renameBoard(board.id, renameDraft)}
@@ -675,25 +720,34 @@ export default function WhiteboardEngine({ scope, title }: Props) {
                 if (event.key === 'Enter') renameBoard(board.id, renameDraft)
                 if (event.key === 'Escape') setRenameBoardId(null)
               }}
-              onClick={(event) => event.stopPropagation()}
               style={boardNameInput}
             />
           ) : (
-            <span
-              onDoubleClick={(event) => {
-                event.stopPropagation()
-                setRenameBoardId(board.id)
-                setRenameDraft(board.name)
-              }}
+            <button
+              type="button"
+              onClick={() => setActiveBoardId(board.id)}
               style={boardNameButton}
-              title="Double-click to rename"
             >
               {board.name}
-            </span>
+            </button>
           )}
 
-          {children.length > 0 && !nested && (
+          {children.length > 0 && !nested && !renaming && hoveredBoardId !== board.id && (
             <span style={{ color: 'var(--text-muted)', fontSize: '0.65rem', flexShrink: 0 }}>{children.length}</span>
+          )}
+
+          {hoveredBoardId === board.id && !renaming && (
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); setRenameBoardId(board.id); setRenameDraft(board.name) }}
+              title="Rename"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', color: 'var(--text-muted)', flexShrink: 0, display: 'flex', alignItems: 'center' }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
           )}
         </div>
 
@@ -705,15 +759,34 @@ export default function WhiteboardEngine({ scope, title }: Props) {
   return (
     <div style={{ flex: 1, width: '100%', minWidth: 0, display: 'flex', height: '100%', minHeight: 0, overflow: 'hidden' }}>
       <div style={{
-        width: 240,
+        width: sbCollapsed ? 32 : sbW,
         flexShrink: 0,
         borderRight: '1px solid var(--border)',
         display: 'flex',
         flexDirection: 'column',
         background: 'var(--bg-sidebar)',
         minHeight: 0,
+        position: 'relative',
+        transition: sbDragging.current ? 'none' : 'width 0.15s',
       }}>
-        <div style={{ padding: '16px 12px 10px' }}>
+        {/* Collapse toggle */}
+        <button
+          type="button"
+          onClick={toggleSb}
+          title={sbCollapsed ? 'Expand' : 'Collapse'}
+          style={{
+            position: 'absolute', top: 8, right: 6, zIndex: 20,
+            width: 20, height: 20, borderRadius: 4, border: 'none',
+            background: 'transparent', color: 'var(--text-faint)',
+            cursor: 'pointer', fontSize: '0.8rem', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', padding: 0,
+          }}
+        >
+          {sbCollapsed ? '›' : '‹'}
+        </button>
+
+        {!sbCollapsed && (<>
+        <div style={{ padding: '16px 12px 10px', paddingRight: 28 }}>
           <div style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.92rem', fontFamily: 'var(--font-heading)', marginBottom: 12 }}>
             {title || 'Boards'}
           </div>
@@ -797,6 +870,22 @@ export default function WhiteboardEngine({ scope, title }: Props) {
             ))}
           </div>
         )}
+        </>)}
+
+        {/* Drag handle */}
+        {!sbCollapsed && (
+          <div
+            onMouseDown={startSbDrag}
+            onMouseEnter={() => setSbDragHov(true)}
+            onMouseLeave={() => setSbDragHov(false)}
+            style={{
+              position: 'absolute', right: 0, top: 0, bottom: 0, width: 4,
+              cursor: 'col-resize', zIndex: 10,
+              background: sbDragHov ? 'var(--accent)' : 'transparent',
+              transition: 'background 0.15s',
+            }}
+          />
+        )}
       </div>
 
       {!activeBoardId ? (
@@ -830,7 +919,7 @@ export default function WhiteboardEngine({ scope, title }: Props) {
               )}
               {renameBoardId === activeBoardId ? (
                 <input
-                  autoFocus
+                  ref={renameInputRef}
                   value={renameDraft}
                   onChange={(event) => setRenameDraft(event.target.value)}
                   onBlur={() => { if (activeBoardId) renameBoard(activeBoardId, renameDraft) }}
@@ -841,17 +930,20 @@ export default function WhiteboardEngine({ scope, title }: Props) {
                   style={{ ...boardNameInput, minWidth: 140 }}
                 />
               ) : (
-                <span
-                  onDoubleClick={() => {
-                    if (!activeBoard) return
-                    setRenameBoardId(activeBoard.id)
-                    setRenameDraft(activeBoard.name)
-                  }}
-                  style={{ ...crumbButton, color: 'var(--accent-light)', fontWeight: 700, cursor: 'default' }}
-                  title="Double-click to rename"
-                >
-                  {activeBoard?.name}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ ...crumbButton, color: 'var(--accent-light)', fontWeight: 700 }}>{activeBoard?.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => { if (activeBoard) { setRenameBoardId(activeBoard.id); setRenameDraft(activeBoard.name) } }}
+                    title="Rename board"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                  </button>
+                </div>
               )}
             </div>
 

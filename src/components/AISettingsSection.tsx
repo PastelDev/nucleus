@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { AIConfig, Note, CalendarEvent, Task, PomodoroSettings, Section } from '../lib/types'
 import { today } from '../lib/helpers'
 import * as store from '../lib/storage'
@@ -14,6 +14,16 @@ const TOOL_NAMES = [
   { name: 'update_memories', label: 'Update Memories', safe: false },
   { name: 'generate_image', label: 'Generate Image', safe: false },
   { name: 'generate_images_batch', label: 'Generate Images (Batch)', safe: false },
+  { name: 'delete_note', label: 'Delete Note', safe: false },
+  { name: 'delete_event', label: 'Delete Event', safe: false },
+  { name: 'delete_task', label: 'Delete Task', safe: false },
+  { name: 'complete_task', label: 'Complete Task', safe: false },
+  { name: 'set_focus_topic', label: 'Set Focus Topic', safe: false },
+  { name: 'set_prevent_sleep', label: 'Prevent Sleep', safe: false },
+  { name: 'capture_screen', label: 'Capture Screen', safe: true },
+  { name: 'create_board', label: 'Create Board', safe: false },
+  { name: 'read_artefact', label: 'Read Artefact', safe: true },
+  { name: 'delete_artefact', label: 'Delete Artefact', safe: false },
 ]
 
 interface Props {
@@ -33,6 +43,25 @@ export default function AISettingsSection({
   const [agBuf, setAgBuf] = useState(agentMd)
   const [memEdit, setMemEdit] = useState(false)
   const [memBuf, setMemBuf] = useState(memoriesMd)
+  const [supportsVision, setSupportsVision] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    if (!aiConfig.apiKey || !aiConfig.model) { setSupportsVision(null); return }
+    let cancelled = false
+    setSupportsVision(null)
+    fetch('https://openrouter.ai/api/v1/models', {
+      headers: { 'Authorization': `Bearer ${aiConfig.apiKey}` },
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return
+        const found = (data.data as any[])?.find((m: any) => m.id === aiConfig.model)
+        const modality: string = found?.architecture?.modality || ''
+        setSupportsVision(found ? modality.includes('image') : null)
+      })
+      .catch(() => { if (!cancelled) setSupportsVision(null) })
+    return () => { cancelled = true }
+  }, [aiConfig.model, aiConfig.apiKey])
 
   const updateConfig = (patch: Partial<AIConfig>) => {
     const next = { ...aiConfig, ...patch }
@@ -74,12 +103,20 @@ export default function AISettingsSection({
               style={inp}
             />
           </Field>
-          <Field label="Model ID" hint="Any OpenRouter model ID">
+          <Field
+            label="Model ID"
+            hint={
+              supportsVision === true ? '✓ Vision supported — screen capture enabled'
+              : supportsVision === false ? '✕ No vision — screen capture disabled'
+              : aiConfig.apiKey && aiConfig.model ? 'Checking vision support…'
+              : 'Any OpenRouter model ID'
+            }
+          >
             <input
               value={aiConfig.model}
               onChange={e => updateConfig({ model: e.target.value })}
               placeholder="stepfun/step-3.5-flash:free"
-              style={inp}
+              style={{ ...inp, borderColor: supportsVision === true ? 'var(--green)' : supportsVision === false ? 'var(--border)' : 'var(--border)' }}
             />
           </Field>
         </div>
