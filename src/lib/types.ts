@@ -32,7 +32,7 @@ export interface Note {
 
 /* ── Whiteboard items ── */
 export type WBItemType = 'sticky' | 'textbox' | 'shape' | 'path' | 'image'
-export type ShapeType = 'rect' | 'circle' | 'arrow'
+export type ShapeType = 'rect' | 'circle' | 'arrow' | 'line'
 
 export interface WBItemBase {
   id: string
@@ -106,11 +106,16 @@ export interface Artefact {
 }
 
 /* ── Pomodoro ── */
+export type PomBgType = 'none' | 'starfield' | 'pixel-galaxy' | 'fractal' | 'evolving-shapes' | 'custom-image'
+
 export interface PomodoroSettings {
   work: number
   short: number
   long: number
   rounds: number
+  bgType?: PomBgType
+  bgParams?: Record<string, number>
+  bgImageSrc?: string
 }
 
 /* ── Theme settings ── */

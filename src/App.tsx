@@ -14,6 +14,8 @@ import AIPanel from './components/AIPanel'
 import AISettingsSection from './components/AISettingsSection'
 import SettingsSection from './components/SettingsSection'
 import ArtefactsSection from './components/ArtefactsSection'
+import NucleusLogo from './components/NucleusLogo'
+import FloatingClock from './components/FloatingClock'
 
 const DEFAULT_AGENT_MD = `# Nucleus AI Agent
 
@@ -26,6 +28,9 @@ You are **Nucleus**, an intelligent productivity assistant embedded in the Nucle
 4. Use \`get_current_view_content\` to read what's on screen before editing
 5. Use \`update_memories\` to remember user preferences and important context
 6. Navigate to the relevant section after creating content when it makes sense
+7. Before generating images, describe your planned prompt to the user and ask for confirmation. For batch generation with multiple prompts, list all prompts first. Only call generate_image after the user approves.
+8. When iteration feedback is received from generate_image, immediately refine the prompt based on the feedback and call generate_image again with use_previous_generation: true to use the previous images as reference.
+9. If this model does not support vision and the user uploads images, ask them to describe the content. Their uploaded images can still be used as references for image generation via use_uploaded_references: true.
 
 ## Tone
 Sharp, helpful, minimal. Skip filler. Get to the point.
@@ -55,6 +60,7 @@ export default function App() {
   const [preventSleep, setPreventSleep] = useState(false)
   const [aiOpen, setAiOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [clockVisible, setClockVisible] = useState(() => localStorage.getItem('nucleus-clock-visible') === '1')
   const [ready, setReady] = useState(false)
 
   /* ── Load all data on mount ── */
@@ -94,7 +100,7 @@ export default function App() {
   if (!ready) return (
     <div style={{ height: '100vh', background: 'var(--bg-deep)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '2.5rem', color: 'var(--accent)', marginBottom: 12, animation: 'nuc-spin 2s linear infinite' }}>✦</div>
+        <div style={{ marginBottom: 12, animation: 'nuc-spin 2s linear infinite', display: 'inline-block' }}><NucleusLogo size={48} /></div>
         <div style={{ color: 'var(--text-faint)', fontSize: '0.85rem' }}>Loading Nucleus...</div>
       </div>
     </div>
@@ -106,7 +112,9 @@ export default function App() {
         section={section} setSection={setSection}
         aiOpen={aiOpen} setAiOpen={setAiOpen}
         collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed}
+        clockVisible={clockVisible} setClockVisible={v => { setClockVisible(v); localStorage.setItem('nucleus-clock-visible', v ? '1' : '0') }}
       />
+      <FloatingClock visible={clockVisible} onClose={() => { setClockVisible(false); localStorage.setItem('nucleus-clock-visible', '0') }} />
 
       {/* Main content */}
       <div className="nuc-section" key={section} style={{ flex: 1, overflow: 'hidden', display: 'flex', minWidth: 0 }}>
@@ -121,7 +129,7 @@ export default function App() {
         {section === 'calendar' && <CalendarSection events={events} setEvents={setEvents} />}
         {section === 'pomodoro' && (
           <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
-            <PomodoroSection settings={pomSettings} setSettings={setPomSettings} focusTopic={focusTopic} setFocusTopic={setFocusTopic} preventSleep={preventSleep} setPreventSleep={setPreventSleep} />
+            <PomodoroSection settings={pomSettings} setSettings={setPomSettings} focusTopic={focusTopic} setFocusTopic={setFocusTopic} preventSleep={preventSleep} setPreventSleep={setPreventSleep} artefacts={artefacts} />
           </div>
         )}
         {section === 'artefacts' && (
@@ -157,6 +165,8 @@ export default function App() {
           aiConfig={aiConfig}
           focusTopic={focusTopic} setFocusTopic={setFocusTopic}
           preventSleep={preventSleep} setPreventSleep={setPreventSleep}
+          clockVisible={clockVisible}
+          setClockVisible={v => { setClockVisible(v); localStorage.setItem('nucleus-clock-visible', v ? '1' : '0') }}
           onClose={() => setAiOpen(false)}
         />
       )}

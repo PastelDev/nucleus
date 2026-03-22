@@ -4,6 +4,8 @@ import { uid, today } from '../lib/helpers'
 import * as store from '../lib/storage'
 import { listEventOccurrencesInRange, recurrenceLabel } from '../lib/calendar'
 import Markdown from './Markdown'
+import NucleusLogo from './NucleusLogo'
+import ThinkingBlock from './ThinkingBlock'
 
 /* ── Tool definitions ── */
 const AI_TOOLS = [
@@ -19,8 +21,8 @@ const AI_TOOLS = [
   { type: 'function', function: { name: 'get_all_events', description: 'Get calendar events filtered by date range', parameters: { type: 'object', properties: { date_from: { type: 'string' }, date_to: { type: 'string' } } } } },
   { type: 'function', function: { name: 'read_board', description: 'Read items from a whiteboard or Me sub-board', parameters: { type: 'object', properties: { scope: { type: 'string', enum: ['whiteboards', 'me'] }, board_id: { type: 'string' } }, required: ['scope', 'board_id'] } } },
   { type: 'function', function: { name: 'update_memories', description: 'Update agent memories with important context', parameters: { type: 'object', properties: { content: { type: 'string' } }, required: ['content'] } } },
-  { type: 'function', function: { name: 'generate_image', description: 'Generate image(s) with OpenAI gpt-image-1. User will preview before placement. Requires OpenAI key.', parameters: { type: 'object', properties: { prompt: { type: 'string' }, size: { type: 'string', enum: ['1024x1024', '1536x1024', '1024x1536'] }, quality: { type: 'string', enum: ['low', 'medium', 'high', 'auto'] }, n: { type: 'integer', minimum: 1, maximum: 4 }, scope: { type: 'string', enum: ['whiteboards', 'me'] }, board_id: { type: 'string' }, include_in_context: { type: 'boolean', description: 'If true and model supports vision, pass generated images back as AI context so you can see them' }, reference_path: { type: 'string', description: 'Path of a previously generated image to use as visual reference for generation' }, use_uploaded_references: { type: 'boolean', description: "Use the user's most recently uploaded images as generation reference (works even without vision)" } }, required: ['prompt'] } } },
-  { type: 'function', function: { name: 'generate_images_batch', description: 'Generate multiple images from different prompts. User will preview before placement.', parameters: { type: 'object', properties: { prompts: { type: 'array', items: { type: 'string' } }, size: { type: 'string', enum: ['1024x1024', '1536x1024', '1024x1536'] }, quality: { type: 'string', enum: ['low', 'medium', 'high', 'auto'] }, scope: { type: 'string', enum: ['whiteboards', 'me'] }, board_id: { type: 'string' }, include_in_context: { type: 'boolean', description: 'If true and model supports vision, pass generated images back as AI context so you can see them' }, reference_path: { type: 'string', description: 'Path of a previously generated image to use as visual reference' }, use_uploaded_references: { type: 'boolean', description: "Use the user's most recently uploaded images as generation reference" } }, required: ['prompts'] } } },
+  { type: 'function', function: { name: 'generate_image', description: 'Generate image(s) with OpenAI gpt-image-1. User will preview before placement. Requires OpenAI key.', parameters: { type: 'object', properties: { prompt: { type: 'string' }, size: { type: 'string', enum: ['1024x1024', '1536x1024', '1024x1536'] }, quality: { type: 'string', enum: ['low', 'medium', 'high', 'auto'] }, n: { type: 'integer', minimum: 1, maximum: 4 }, scope: { type: 'string', enum: ['whiteboards', 'me'] }, board_id: { type: 'string' }, include_in_context: { type: 'boolean', description: 'If true and model supports vision, pass generated images back as AI context so you can see them' }, reference_path: { type: 'string', description: 'Path of a previously generated image to use as visual reference for generation' }, use_uploaded_references: { type: 'boolean', description: "Use the user's most recently uploaded images as generation reference (works even without vision)" }, use_previous_generation: { type: 'boolean', description: 'Use the most recently generated images as reference for iteration' } }, required: ['prompt'] } } },
+  { type: 'function', function: { name: 'generate_images_batch', description: 'Generate multiple images from different prompts. User will preview before placement.', parameters: { type: 'object', properties: { prompts: { type: 'array', items: { type: 'string' } }, size: { type: 'string', enum: ['1024x1024', '1536x1024', '1024x1536'] }, quality: { type: 'string', enum: ['low', 'medium', 'high', 'auto'] }, scope: { type: 'string', enum: ['whiteboards', 'me'] }, board_id: { type: 'string' }, include_in_context: { type: 'boolean', description: 'If true and model supports vision, pass generated images back as AI context so you can see them' }, reference_path: { type: 'string', description: 'Path of a previously generated image to use as visual reference' }, use_uploaded_references: { type: 'boolean', description: "Use the user's most recently uploaded images as generation reference" }, use_previous_generation: { type: 'boolean', description: 'Use the most recently generated images as reference for iteration' } }, required: ['prompts'] } } },
   { type: 'function', function: { name: 'create_artefact', description: 'Create a new HTML or React (JSX) artefact in the Artefacts panel. Use type "html" for plain HTML/CSS/JS and "react" for JSX components (exports a default App component).', parameters: { type: 'object', properties: { title: { type: 'string' }, type: { type: 'string', enum: ['html', 'react'] }, code: { type: 'string', description: 'Full HTML document or React JSX code. For react, write a function App() {} and export it as default or just define it — it will be rendered automatically.' }, artefact_id: { type: 'string', description: 'ID of an existing artefact to update instead of creating new' } }, required: ['title', 'type', 'code'] } } },
   { type: 'function', function: { name: 'delete_note', description: 'Permanently delete a note by ID', parameters: { type: 'object', properties: { note_id: { type: 'string' } }, required: ['note_id'] } } },
   { type: 'function', function: { name: 'delete_event', description: 'Permanently delete a calendar event by ID', parameters: { type: 'object', properties: { event_id: { type: 'string' } }, required: ['event_id'] } } },
@@ -32,6 +34,8 @@ const AI_TOOLS = [
   { type: 'function', function: { name: 'create_board', description: 'Create a new whiteboard or Me sub-board', parameters: { type: 'object', properties: { scope: { type: 'string', enum: ['whiteboards', 'me'] }, name: { type: 'string' } }, required: ['scope', 'name'] } } },
   { type: 'function', function: { name: 'read_artefact', description: 'Read the full code of an artefact by ID', parameters: { type: 'object', properties: { artefact_id: { type: 'string' } }, required: ['artefact_id'] } } },
   { type: 'function', function: { name: 'delete_artefact', description: 'Permanently delete an artefact by ID', parameters: { type: 'object', properties: { artefact_id: { type: 'string' } }, required: ['artefact_id'] } } },
+  { type: 'function', function: { name: 'toggle_clock', description: 'Show or hide the floating clock', parameters: { type: 'object', properties: { visible: { type: 'boolean' } }, required: ['visible'] } } },
+  { type: 'function', function: { name: 'set_pomodoro_background', description: 'Change the Pomodoro timer background animation. For custom-image type, provide image_src (URL) or artefact_id to use an artefact as background.', parameters: { type: 'object', properties: { type: { type: 'string', enum: ['none', 'starfield', 'pixel-galaxy', 'fractal', 'evolving-shapes', 'custom-image'] }, speed: { type: 'number', description: 'Animation speed 0.1–2.0' }, density: { type: 'number', description: 'Element count/density 20–300' }, image_src: { type: 'string', description: 'Image URL for custom-image type' }, artefact_id: { type: 'string', description: 'ID of an artefact to use as background (sets type to custom-image automatically)' } }, required: ['type'] } } },
 ]
 
 /* ── Context builder ── */
@@ -99,6 +103,7 @@ interface Props {
   aiConfig: AIConfig
   focusTopic: string; preventSleep: boolean
   setFocusTopic: (v: string) => void; setPreventSleep: (v: boolean) => void
+  clockVisible: boolean; setClockVisible: (v: boolean) => void
   onClose: () => void
 }
 
@@ -106,7 +111,8 @@ export default function AIPanel({
   notes, events, tasks, artefacts, section, pomSettings,
   setNotes, setEvents, setTasks, setArtefacts, setSection, setPomSettings,
   agentMd, memoriesMd, setMemoriesMd,
-  aiConfig, focusTopic, setFocusTopic, preventSleep, setPreventSleep, onClose,
+  aiConfig, focusTopic, setFocusTopic, preventSleep, setPreventSleep,
+  clockVisible, setClockVisible, onClose,
 }: Props) {
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [apiMsgs, setApiMsgs] = useState<any[]>([])
@@ -126,6 +132,7 @@ export default function AIPanel({
   const fileRef = useRef<HTMLInputElement>(null)
   const imgMsgIdxRef = useRef<number>(-1)
   const uploadedRefsRef = useRef<string[]>([])
+  const lastGeneratedPathsRef = useRef<string[]>([])
 
   // Resizable panel
   const [panelW, setPanelW] = useState(() => {
@@ -215,6 +222,10 @@ export default function AIPanel({
       else { payload.prompt = args.prompt; payload.n = args.n || 1 }
       if (args.scope && args.board_id) { payload.scope = args.scope; payload.board_id = args.board_id }
       if (args.reference_path) payload.reference_paths = [args.reference_path]
+      // Auto-reference last generated images if iterating
+      if (args.use_previous_generation && lastGeneratedPathsRef.current.length > 0) {
+        payload.reference_paths = lastGeneratedPathsRef.current
+      }
       if (args.use_uploaded_references && uploadedRefsRef.current.length > 0) {
         payload.reference_base64_images = uploadedRefsRef.current.map(d => d.split(',')[1] || d)
       }
@@ -222,6 +233,9 @@ export default function AIPanel({
       const res = await fetch('/api/generate-image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       const data = await res.json()
       if (data.error) return { error: data.error }
+
+      // Track generated paths for iteration
+      lastGeneratedPathsRef.current = data.paths || []
 
       // Add preview message and wait for user action
       const imgIdx = msgs.length + (pendingApproval ? 1 : 0)
@@ -232,12 +246,25 @@ export default function AIPanel({
         resolve => setPendingImg({ paths: data.paths, args, resolve: (type, iterPrompt) => resolve({ type, iterPrompt }) })
       )
 
+      const promptUsed = isBatch ? (args.prompts || []).join('; ') : (args.prompt || '')
+
+      // Always pass images to vision models (no include_in_context gate)
+      const ctxImages = (supportsVision && data.b64_images) ? data.b64_images : undefined
+
+      // Base result for non-vision models
+      const nonVisionInfo = !supportsVision ? {
+        images_generated: true,
+        vision_unavailable: true,
+        prompt_used: promptUsed,
+        image_count: (data.paths || []).length,
+        user_can_see_images: true,
+        note: 'Images are visible to the user in the chat. You cannot see them. Ask the user to describe what they see if you need visual feedback. Use use_previous_generation: true to iterate on these images.',
+      } : {}
+
       if (action.type === 'discard') {
         setMsgs(p => p.map((m, i) => i === imgMsgIdxRef.current ? { ...m, imageStatus: 'discarded' } : m))
-        return { ok: true, placed: false, message: 'Images discarded by user' }
+        return { ok: true, placed: false, message: 'Images discarded by user', ...nonVisionInfo }
       }
-
-      const ctxImages = (args.include_in_context && supportsVision && data.b64_images) ? data.b64_images : undefined
 
       if (action.type === 'insert' && args.scope && args.board_id) {
         setMsgs(p => p.map((m, i) => i === imgMsgIdxRef.current ? { ...m, imageStatus: 'inserted' } : m))
@@ -251,17 +278,17 @@ export default function AIPanel({
           setSection(args.scope === 'me' ? 'me' : 'whiteboard')
           window.dispatchEvent(new CustomEvent('nucleus:select-board', { detail: { scope: args.scope, boardId: args.board_id } }))
         }
-        return { ok: true, placed: true, paths: data.paths, count: data.paths.length, ...(ctxImages ? { _context_images: ctxImages } : {}) }
+        return { ok: true, placed: true, paths: data.paths, count: data.paths.length, ...nonVisionInfo, ...(ctxImages ? { _context_images: ctxImages } : {}) }
       }
 
       if (action.type === 'insert') {
         setMsgs(p => p.map((m, i) => i === imgMsgIdxRef.current ? { ...m, imageStatus: 'inserted' } : m))
-        return { ok: true, placed: false, paths: data.paths, note: 'No board specified — images generated but not placed', ...(ctxImages ? { _context_images: ctxImages } : {}) }
+        return { ok: true, placed: false, paths: data.paths, note: 'No board specified — images generated but not placed', ...nonVisionInfo, ...(ctxImages ? { _context_images: ctxImages } : {}) }
       }
 
       // iterate
       setMsgs(p => p.map((m, i) => i === imgMsgIdxRef.current ? { ...m, imageStatus: 'iterating' } : m))
-      return { ok: true, placed: false, iterate_with: action.iterPrompt, message: 'User wants to refine — use iterate_with as feedback to regenerate' }
+      return { ok: true, placed: false, iterate_with: action.iterPrompt, message: 'User wants to refine — use iterate_with as feedback to regenerate. Call generate_image again with use_previous_generation: true and the refined prompt.', ...nonVisionInfo }
     } catch (e: any) {
       return { error: `Image generation error: ${e.message}` }
     } finally {
@@ -406,6 +433,22 @@ export default function AIPanel({
         setArtefacts(p => p.filter(a => { if (a.id === args.artefact_id) { found = true; return false } return true }))
         return found ? { ok: true } : { error: 'Artefact not found' }
       }
+      case 'toggle_clock': setClockVisible(!!args.visible); return { ok: true, visible: !!args.visible }
+      case 'set_pomodoro_background': {
+        const bgParams: Record<string, number> = {}
+        if (args.speed) bgParams.speed = args.speed
+        if (args.density) bgParams.density = args.density
+        const bgType = args.artefact_id ? 'custom-image' : args.type
+        const bgImageSrc = args.artefact_id ? `artefact:${args.artefact_id}` : args.image_src
+        setPomSettings(p => ({
+          ...p,
+          bgType,
+          bgParams: { ...p.bgParams, ...bgParams },
+          ...(bgImageSrc ? { bgImageSrc } : {}),
+        }))
+        if (bgType !== 'none') setSection('pomodoro')
+        return { ok: true, bgType }
+      }
       default: return { error: `Unknown tool: ${name}` }
     }
   }
@@ -422,9 +465,14 @@ export default function AIPanel({
     setMsgs(p => [...p, { role: 'user', content: userText, refImgs: attachments.length ? attachments : undefined }])
 
     // Build API message (with images if any)
-    const userContent: any = attachments.length
-      ? [{ type: 'text', text: userText }, ...attachments.map(b64 => ({ type: 'image_url', image_url: { url: b64 } }))]
-      : userText
+    let userContent: any
+    if (attachments.length && supportsVision) {
+      userContent = [{ type: 'text', text: userText }, ...attachments.map(b64 => ({ type: 'image_url', image_url: { url: b64 } }))]
+    } else if (attachments.length && !supportsVision) {
+      userContent = `${userText}\n\n[User attached ${attachments.length} image(s). You cannot see them because this model does not support vision. Ask the user to describe the image content. The images are available as reference for image generation — use use_uploaded_references: true in generate_image to use them.]`
+    } else {
+      userContent = userText
+    }
     const sys = `${agentMd}\n\n## Current App Context\n${ctxText}\n\n## Your Memories\n${memoriesMd}`
     let ms = [...apiMsgs, { role: 'user', content: userContent }]
 
@@ -662,28 +710,33 @@ export default function AIPanel({
         )}
         {msgs.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.82rem', marginTop: 44, lineHeight: 1.9, padding: '0 8px' }}>
-            <div style={{ fontSize: '1.6rem', marginBottom: 12, color: 'var(--text-ghost)' }}>✦</div>
+            <div style={{ marginBottom: 12, opacity: 0.3 }}><NucleusLogo size={36} /></div>
             Ask me anything — I can control the app, create content, generate images, and more.
           </div>
         )}
-        {msgs.map((m, i) => (
-          <div key={i} style={{ marginBottom: 9, display: 'flex', flexDirection: 'column', alignItems: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-            {m.role === 'tool_call' ? (
-              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 11px', fontSize: '0.72rem', maxWidth: '95%' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: m.toolArgs && Object.keys(m.toolArgs).length ? 5 : 0 }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
-                  <span style={{ color: 'var(--accent-light)', fontFamily: 'monospace', fontWeight: 700 }}>{m.toolName}()</span>
-                </div>
-                {m.toolArgs && Object.entries(m.toolArgs).slice(0, 4).map(([k, v]) => (
-                  <div key={k} style={{ color: 'var(--text-faint)', paddingLeft: 12, lineHeight: 1.6 }}>
-                    <span style={{ color: 'var(--text-muted)' }}>{k}:</span> {String(v).slice(0, 50)}
-                  </div>
-                ))}
-                {m.screenshotB64 && (
-                  <img src={`data:image/jpeg;base64,${m.screenshotB64}`} alt="Screenshot" style={{ width: '100%', borderRadius: 5, marginTop: 6, border: '1px solid var(--border)', display: 'block' }} />
-                )}
-              </div>
-            ) : m.role === 'image_preview' ? (
+        {(() => {
+          // Group consecutive tool_call messages into ThinkingBlocks
+          const grouped: Array<{ type: 'msg'; msg: Msg; idx: number } | { type: 'thinking'; calls: Msg[]; startIdx: number }> = []
+          let i = 0
+          while (i < msgs.length) {
+            if (msgs[i].role === 'tool_call') {
+              const calls: Msg[] = []
+              const startIdx = i
+              while (i < msgs.length && msgs[i].role === 'tool_call') { calls.push(msgs[i]); i++ }
+              grouped.push({ type: 'thinking', calls, startIdx })
+            } else {
+              grouped.push({ type: 'msg', msg: msgs[i], idx: i })
+              i++
+            }
+          }
+          return grouped.map((g, gi) => {
+            if (g.type === 'thinking') {
+              return <ThinkingBlock key={`t-${g.startIdx}`} calls={g.calls} />
+            }
+            const m = g.msg
+            return (
+          <div key={gi} style={{ marginBottom: 9, display: 'flex', flexDirection: 'column', alignItems: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+            {m.role === 'image_preview' ? (
               <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 10, maxWidth: '97%', width: '97%' }}>
                 <div style={{ fontSize: '0.68rem', color: 'var(--accent-light)', marginBottom: 8, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                   {m.imageStatus === 'inserted' ? '✓ Inserted to board' : m.imageStatus === 'discarded' ? '✕ Discarded' : m.imageStatus === 'iterating' ? '↻ Iterating...' : 'Generated Images'}
@@ -709,7 +762,9 @@ export default function AIPanel({
               </div>
             )}
           </div>
-        ))}
+            )
+          })
+        })()}
         {streamingMsg !== null && (
           <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 4 }}>
             <div style={{
@@ -793,7 +848,7 @@ export default function AIPanel({
       )}
 
       {/* Input */}
-      <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)', display: 'flex', gap: 6, flexShrink: 0, alignItems: 'flex-end' }}>
+      <div className="liquid-glass-subtle" style={{ padding: '10px 12px', margin: '0 8px 8px', borderRadius: 12, display: 'flex', gap: 6, flexShrink: 0, alignItems: 'flex-end' }}>
         <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFileSelect} style={{ display: 'none' }} />
         <button onClick={() => fileRef.current?.click()} title="Attach image reference" style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 9px', color: 'var(--text-faint)', cursor: 'pointer', flexShrink: 0, lineHeight: 0 }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8.5 13.5l2.5 3 3.5-4.5 4.5 6H5z"/><circle cx="8.5" cy="8.5" r="1.5"/></svg>

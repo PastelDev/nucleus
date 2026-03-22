@@ -1,4 +1,5 @@
 import type { Section } from '../lib/types'
+import NucleusLogo from './NucleusLogo'
 
 interface NavItem {
   id: Section
@@ -24,9 +25,11 @@ interface Props {
   setAiOpen: (v: boolean) => void
   collapsed: boolean
   setCollapsed: (v: boolean) => void
+  clockVisible: boolean
+  setClockVisible: (v: boolean) => void
 }
 
-export default function Sidebar({ section, setSection, aiOpen, setAiOpen, collapsed, setCollapsed }: Props) {
+export default function Sidebar({ section, setSection, aiOpen, setAiOpen, collapsed, setCollapsed, clockVisible, setClockVisible }: Props) {
   const w = collapsed ? 52 : 196
 
   return (
@@ -42,20 +45,25 @@ export default function Sidebar({ section, setSection, aiOpen, setAiOpen, collap
       overflow: 'hidden',
     }}>
       {/* Logo */}
-      <div style={{
-        padding: collapsed ? '2px 4px 24px' : '2px 10px 24px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 9,
-        cursor: 'pointer',
-        justifyContent: collapsed ? 'center' : 'flex-start',
-      }} onClick={() => setCollapsed(!collapsed)}>
+      <div
+        className="liquid-glass-subtle"
+        style={{
+          padding: collapsed ? '8px 4px' : '8px 10px',
+          marginBottom: 18,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 9,
+          cursor: 'pointer',
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          borderRadius: 12,
+        }}
+        onClick={() => setCollapsed(!collapsed)}
+      >
         <div style={{
           width: 30, height: 30, borderRadius: 9,
-          background: 'linear-gradient(135deg, var(--accent), var(--accent-light))',
           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         }}>
-          <span style={{ color: '#fff', fontSize: '0.9rem', fontWeight: 800 }}>✦</span>
+          <NucleusLogo size={28} />
         </div>
         {!collapsed && (
           <span style={{
@@ -147,6 +155,29 @@ export default function Sidebar({ section, setSection, aiOpen, setAiOpen, collap
           </svg>
           {!collapsed && (
             <>AI Settings{section === 'ai-settings' && <div style={{ marginLeft: 'auto', width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />}</>
+          )}
+        </button>
+        {/* Clock toggle */}
+        <button
+          onClick={() => setClockVisible(!clockVisible)}
+          title={collapsed ? 'Clock' : undefined}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+            padding: collapsed ? '10px 0' : '10px 12px',
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            borderRadius: 'var(--radius)', border: 'none',
+            background: clockVisible ? 'var(--accent-surface)' : 'transparent',
+            color: clockVisible ? 'var(--accent-light)' : 'var(--text-muted)',
+            cursor: 'pointer', fontSize: '0.88rem',
+            fontWeight: clockVisible ? 700 : 500,
+            textAlign: 'left', transition: 'all 0.12s', fontFamily: 'inherit',
+          }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
+          </svg>
+          {!collapsed && (
+            <>Clock{clockVisible && <div style={{ marginLeft: 'auto', width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />}</>
           )}
         </button>
         {/* AI Chat toggle */}

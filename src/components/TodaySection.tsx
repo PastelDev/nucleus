@@ -14,6 +14,7 @@ interface APOD {
   title: string
   url: string
   hdurl?: string
+  thumbnail_url?: string
   explanation: string
   media_type: string
   date: string
@@ -29,15 +30,29 @@ export default function TodaySection({ tasks, setTasks, events, setSection }: Pr
   const done = todayTasks.filter(t => t.done).length
 
   useEffect(() => {
-    const cacheKey = 'nucleus-apod-' + new Date().toISOString().slice(0, 10)
+    const cacheKey = 'nucleus-apod-img-' + new Date().toISOString().slice(0, 10)
     const cached = localStorage.getItem(cacheKey)
     if (cached) { setApod(JSON.parse(cached)); return }
     // Clean up old cached keys
-    Object.keys(localStorage).filter(k => k.startsWith('nucleus-apod-') && k !== cacheKey).forEach(k => localStorage.removeItem(k))
-    fetch('https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY')
-      .then(r => r.json())
-      .then(d => { setApod(d); localStorage.setItem(cacheKey, JSON.stringify(d)) })
-      .catch(() => {})
+    Object.keys(localStorage).filter(k => k.startsWith('nucleus-apod') && k !== cacheKey).forEach(k => localStorage.removeItem(k))
+    // Fetch APOD, if video with no thumbnail try previous days until we find an image
+    const tryFetch = (daysBack: number): void => {
+      if (daysBack > 5) return
+      const d = new Date(); d.setDate(d.getDate() - daysBack)
+      const dateStr = d.toISOString().slice(0, 10)
+      fetch(`https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY&date=${dateStr}&thumbs=true`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.media_type === 'image' || (data.thumbnail_url && data.thumbnail_url.length > 0)) {
+            setApod(data)
+            localStorage.setItem(cacheKey, JSON.stringify(data))
+          } else {
+            tryFetch(daysBack + 1)
+          }
+        })
+        .catch(() => {})
+    }
+    tryFetch(0)
   }, [])
 
   const add = () => {
@@ -59,6 +74,14 @@ export default function TodaySection({ tasks, setTasks, events, setSection }: Pr
       </div>
 
       {/* NASA APOD */}
+      {!apod && (
+        <div style={{ marginBottom: 28, borderRadius: 16, overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--bg-surface)', height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-faint)', fontSize: '0.8rem' }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', animation: 'nuc-pulse 1.2s ease-in-out infinite' }} />
+            Loading NASA Image of the Day...
+          </div>
+        </div>
+      )}
       {apod && apod.media_type === 'image' && (
         <div style={{ marginBottom: 28, borderRadius: 16, overflow: 'hidden', border: '1px solid #1e1540', background: '#0d0a20' }}>
           <div
@@ -76,6 +99,47 @@ export default function TodaySection({ tasks, setTasks, events, setSection }: Pr
                 transition: 'height 0.3s',
               }}
             />
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'linear-gradient(to top, rgba(7,4,18,0.92) 0%, transparent 55%)',
+              display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '14px 16px',
+            }}>
+              <div style={{ fontSize: '0.6rem', color: '#7060a0', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>NASA · Image of the Day</div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#e0d0ff', letterSpacing: '-0.01em' }}>{apod.title}</div>
+            </div>
+          </div>
+          {apodExpanded && (
+            <div style={{ padding: '12px 16px 16px' }}>
+              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.7 }}>
+                {apod.explanation.slice(0, 380)}{apod.explanation.length > 380 ? '…' : ''}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+      {apod && apod.media_type === 'video' && (
+        <div style={{ marginBottom: 28, borderRadius: 16, overflow: 'hidden', border: '1px solid #1e1540', background: '#0d0a20' }}>
+          <div
+            onClick={() => setApodExpanded(!apodExpanded)}
+            style={{ cursor: 'pointer', position: 'relative' }}
+          >
+            {apod.thumbnail_url ? (
+              <img
+                src={apod.thumbnail_url}
+                alt={apod.title}
+                style={{
+                  width: '100%',
+                  height: apodExpanded ? 'auto' : 200,
+                  objectFit: 'cover',
+                  display: 'block',
+                  transition: 'height 0.3s',
+                }}
+              />
+            ) : (
+              <div style={{ width: '100%', height: 200, background: 'linear-gradient(135deg, #0d0a20, #1a1040)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: '2rem', opacity: 0.3 }}>🎬</span>
+              </div>
+            )}
             <div style={{
               position: 'absolute', inset: 0,
               background: 'linear-gradient(to top, rgba(7,4,18,0.92) 0%, transparent 55%)',

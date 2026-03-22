@@ -152,8 +152,8 @@ export default function CalendarSection({ events, setEvents }: Props) {
             <div style={{ color: 'var(--text-faint)', fontSize: '0.83rem', textAlign: 'center', marginTop: 10 }}>No events</div>
           ) : (
             selEvs.map(ev => (
-              <div key={ev.id} style={{
-                background: 'var(--bg-elevated)', borderRadius: 'var(--radius)', padding: '10px 12px',
+              <div key={ev.id} className="liquid-glass-subtle" style={{
+                borderRadius: 'var(--radius)', padding: '10px 12px',
                 marginBottom: 6, borderLeft: `3px solid ${ev.color}`,
                 display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
               }}>

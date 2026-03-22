@@ -12,11 +12,13 @@ const WB_TOOLS = [
   { id: 'circle', label: 'Ellipse', icon: 'M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z' },
   { id: 'arrow', label: 'Arrow', icon: 'M5 12h14M12 5l7 7-7 7' },
   { id: 'pen', label: 'Pen', icon: 'M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z' },
+  { id: 'eraser', label: 'Eraser', icon: 'M20 20H7l-4-4 10-10 7 7-3 3M14 4l7 7' },
+  { id: 'line', label: 'Line', icon: 'M5 19L19 5' },
   { id: 'image', label: 'Image', icon: 'M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5z' },
 ] as const
 
 type ToolId = (typeof WB_TOOLS)[number]['id']
-type ShapeTool = 'rect' | 'circle' | 'arrow'
+type ShapeTool = 'rect' | 'circle' | 'arrow' | 'line'
 type Scope = 'whiteboards' | 'me'
 
 interface Props {
@@ -541,9 +543,33 @@ export default function WhiteboardEngine({ scope, title }: Props) {
       return
     }
 
-    if (tool === 'rect' || tool === 'circle' || tool === 'arrow') {
+    if (tool === 'eraser') {
+      // Find and remove the item under cursor (prioritize paths/strokes)
+      const hitItem = [...items].reverse().find(item => {
+        if (item.type === 'path') {
+          // Check proximity to path points
+          const pts = item.d.match(/[\d.]+/g)?.map(Number) || []
+          for (let pi = 0; pi < pts.length - 1; pi += 2) {
+            const dist = Math.sqrt((x - pts[pi]) ** 2 + (y - pts[pi + 1]) ** 2)
+            if (dist < 15) return true
+          }
+          return false
+        }
+        if ('x' in item && 'w' in item) {
+          return x >= item.x && x <= item.x + (item.w || 0) && y >= item.y && y <= item.y + (item.h || 0)
+        }
+        return false
+      })
+      if (hitItem) {
+        pushUndoSnapshot()
+        setItems(current => current.filter(i => i.id !== hitItem.id))
+      }
+      return
+    }
+
+    if (tool === 'rect' || tool === 'circle' || tool === 'arrow' || tool === 'line') {
       beginGestureHistory()
-      setCreating({ type: tool, sx: x, sy: y, ex: x, ey: y })
+      setCreating({ type: tool as ShapeTool, sx: x, sy: y, ex: x, ey: y })
       viewRef.current?.setPointerCapture(event.pointerId)
     }
   }
@@ -560,7 +586,7 @@ export default function WhiteboardEngine({ scope, title }: Props) {
       const dy = y - drag.sy
       setItems((current) => current.map((item) => {
         if (item.id !== drag.id) return item
-        if (item.type === 'shape' && item.shapeType === 'arrow') {
+        if (item.type === 'shape' && (item.shapeType === 'arrow' || item.shapeType === 'line')) {
           return { ...item, x: drag.ox + dx, y: drag.oy + dy, x2: (drag.ox2 ?? item.x2 ?? 0) + dx, y2: (drag.oy2 ?? item.y2 ?? 0) + dy }
         }
         return { ...item, x: drag.ox + dx, y: drag.oy + dy } as WBItem
@@ -624,8 +650,8 @@ export default function WhiteboardEngine({ scope, title }: Props) {
       const distance = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2)
       if (distance > 8) {
         let item: WBItem
-        if (type === 'arrow') {
-          item = { id: uid(), type: 'shape', shapeType: 'arrow', x: sx, y: sy, x2: ex, y2: ey, color: inkColor }
+        if (type === 'arrow' || type === 'line') {
+          item = { id: uid(), type: 'shape', shapeType: type, x: sx, y: sy, x2: ex, y2: ey, color: inkColor }
         } else {
           item = {
             id: uid(),
@@ -684,6 +710,7 @@ export default function WhiteboardEngine({ scope, title }: Props) {
     const preview = { stroke: inkColor, strokeWidth: 2, strokeDasharray: '6 3', fill: `${inkColor}22` }
     if (type === 'rect') return <rect x={x} y={y} width={w} height={h} rx={4} {...preview} />
     if (type === 'circle') return <ellipse cx={x + w / 2} cy={y + h / 2} rx={w / 2} ry={h / 2} {...preview} />
+    if (type === 'line') return <line x1={sx} y1={sy} x2={ex} y2={ey} stroke={inkColor} strokeWidth={2} strokeDasharray="6 3" strokeLinecap="round" />
     return (
       <>
         <line x1={sx} y1={sy} x2={ex} y2={ey} stroke={inkColor} strokeWidth={2} strokeDasharray="6 3" />
@@ -897,7 +924,7 @@ export default function WhiteboardEngine({ scope, title }: Props) {
           <div
             ref={toolbarRef}
             style={{
-              minHeight: 58,
+              minHeight: 'auto',
               flexShrink: 0,
               background: 'var(--bg-sidebar)',
               borderBottom: '1px solid var(--border)',
@@ -905,7 +932,9 @@ export default function WhiteboardEngine({ scope, title }: Props) {
               alignItems: 'center',
               gap: 6,
               padding: '10px 14px',
-              overflowX: 'auto',
+              flexWrap: 'wrap',
+              overflow: 'visible',
+              position: 'relative',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 10, flexShrink: 0 }}>
@@ -1192,6 +1221,18 @@ export default function WhiteboardEngine({ scope, title }: Props) {
                     )
                   }
 
+                  if (item.shapeType === 'line') {
+                    return (
+                      <line
+                        key={item.id}
+                        x1={item.x} y1={item.y} x2={item.x2} y2={item.y2}
+                        stroke={item.color} strokeWidth={strokeWidth} strokeLinecap="round"
+                        style={{ pointerEvents: 'all', cursor: 'move' }}
+                        onPointerDown={onPointerDown}
+                      />
+                    )
+                  }
+
                   return (
                     <g key={item.id} style={{ pointerEvents: 'all', cursor: 'move' }} onPointerDown={onPointerDown}>
                       <line x1={item.x} y1={item.y} x2={item.x2} y2={item.y2} stroke={item.color} strokeWidth={strokeWidth} />
@@ -1354,10 +1395,9 @@ const toolButton: CSSProperties = {
 
 const popover: CSSProperties = {
   position: 'absolute',
-  top: '50%',
-  left: 'calc(100% + 8px)',
-  transform: 'translateY(-50%)',
-  zIndex: 20,
+  top: 'calc(100% + 6px)',
+  left: 0,
+  zIndex: 50,
   background: 'var(--bg-surface)',
   border: '1px solid var(--border)',
   borderRadius: 12,
@@ -1365,6 +1405,7 @@ const popover: CSSProperties = {
   display: 'flex',
   gap: 8,
   boxShadow: 'var(--shadow-lg)',
+  whiteSpace: 'nowrap',
 }
 
 const ghostChip: CSSProperties = {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { CSSProperties, Dispatch, SetStateAction } from 'react'
-import type { PomodoroSettings } from '../lib/types'
+import type { PomodoroSettings, PomBgType, Artefact } from '../lib/types'
+import PomodoroBackground from './PomodoroBackground'
 
 interface Props {
   settings: PomodoroSettings
@@ -9,6 +10,7 @@ interface Props {
   setFocusTopic: (v: string) => void
   preventSleep: boolean
   setPreventSleep: (v: boolean) => void
+  artefacts: Artefact[]
 }
 
 type PomMode = 'work' | 'short' | 'long'
@@ -19,7 +21,8 @@ const getDuration = (mode: PomMode, settings: PomodoroSettings) =>
 const getModeLabel = (mode: PomMode) =>
   ({ work: 'Focus', short: 'Short Break', long: 'Long Break' }[mode])
 
-export default function PomodoroSection({ settings, setSettings, focusTopic, setFocusTopic, preventSleep, setPreventSleep }: Props) {
+export default function PomodoroSection({ settings, setSettings, focusTopic, setFocusTopic, preventSleep, setPreventSleep, artefacts }: Props) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [mode, setMode] = useState<PomMode>('work')
   const [timeLeft, setTimeLeft] = useState(settings.work * 60)
   const [running, setRunning] = useState(false)
@@ -122,6 +125,13 @@ export default function PomodoroSection({ settings, setSettings, focusTopic, set
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative', padding: '24px 32px' }}>
 
+      <PomodoroBackground
+        type={settings.bgType || 'none'}
+        params={settings.bgParams || {}}
+        imageSrc={settings.bgImageSrc}
+        artefacts={artefacts}
+      />
+
       {/* Settings gear button */}
       <button
         onClick={() => setSettingsOpen(true)}
@@ -130,6 +140,7 @@ export default function PomodoroSection({ settings, setSettings, focusTopic, set
           position: 'absolute',
           top: 16,
           right: 20,
+          zIndex: 3,
           background: 'transparent',
           border: 'none',
           cursor: 'pointer',
@@ -151,8 +162,8 @@ export default function PomodoroSection({ settings, setSettings, focusTopic, set
       </button>
 
       {/* Focusing on */}
-      <div style={{ width: '100%', maxWidth: 480, marginBottom: 20 }}>
-        <div style={{ color: 'var(--text-muted)', fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 7 }}>
+      <div style={{ width: '100%', maxWidth: 480, marginBottom: 20, position: 'relative', zIndex: 2 }}>
+        <div style={{ color: 'var(--text-secondary)', fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 7 }}>
           Focusing on
         </div>
         <input
@@ -160,10 +171,10 @@ export default function PomodoroSection({ settings, setSettings, focusTopic, set
           placeholder="What are you working on?"
           value={focusTopic}
           onChange={(e) => setFocusTopic(e.target.value)}
+          className="liquid-glass-subtle"
           style={{
             width: '100%',
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border)',
+            border: 'none',
             borderRadius: 11,
             padding: '11px 14px',
             color: 'var(--text-primary)',
@@ -177,14 +188,14 @@ export default function PomodoroSection({ settings, setSettings, focusTopic, set
       </div>
 
       {/* Mode tabs */}
-      <div style={{ display: 'flex', gap: 4, background: 'var(--bg-surface)', borderRadius: 12, padding: 4, marginBottom: 22 }}>
+      <div className="liquid-glass-subtle" style={{ display: 'flex', gap: 4, borderRadius: 12, padding: 4, marginBottom: 22, position: 'relative', zIndex: 2 }}>
         {([['work', 'Work'], ['short', 'Short Break'], ['long', 'Long Break']] as [PomMode, string][]).map(([value, label]) => (
           <button key={value} onClick={() => switchMode(value)} style={{
             background: mode === value ? accent : 'transparent',
             border: 'none',
             borderRadius: 9,
             padding: '8px 16px',
-            color: mode === value ? '#fff' : 'var(--text-muted)',
+            color: mode === value ? '#fff' : 'var(--text-secondary)',
             cursor: 'pointer',
             fontWeight: 700,
             fontSize: '0.8rem',
@@ -197,7 +208,7 @@ export default function PomodoroSection({ settings, setSettings, focusTopic, set
       </div>
 
       {/* Timer circle */}
-      <div style={{ position: 'relative', marginBottom: 22 }}>
+      <div style={{ position: 'relative', marginBottom: 22, zIndex: 2 }}>
         <svg width={256} height={256} style={{ transform: 'rotate(-90deg)' }}>
           <circle cx={128} cy={128} r={radius} stroke="var(--bg-elevated)" strokeWidth={12} fill="none" />
           <circle
@@ -229,16 +240,16 @@ export default function PomodoroSection({ settings, setSettings, focusTopic, set
       </div>
 
       {/* Controls */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
-        <button onClick={resetCurrent} style={secondaryButton}>Reset</button>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20, position: 'relative', zIndex: 2 }}>
+        <button onClick={resetCurrent} style={secondaryButton} className="liquid-glass-subtle">Reset</button>
         <button onClick={() => setRunning((c) => !c)} style={{ ...primaryButton, background: accent }}>
           {running ? 'Pause' : 'Start'}
         </button>
-        <button onClick={skipToNext} style={secondaryButton}>Skip</button>
+        <button onClick={skipToNext} style={secondaryButton} className="liquid-glass-subtle">Skip</button>
       </div>
 
       {/* Cycle dots */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, position: 'relative', zIndex: 2 }}>
         {cycleDots.map((step) => {
           const active = completedSessions % Math.max(1, settings.rounds) >= step || (completedSessions % Math.max(1, settings.rounds) === 0 && completedSessions > 0 && step === Math.max(1, settings.rounds))
           return (
@@ -246,12 +257,12 @@ export default function PomodoroSection({ settings, setSettings, focusTopic, set
               width: 9,
               height: 9,
               borderRadius: '50%',
-              background: active ? accent : 'var(--bg-elevated)',
+              background: active ? accent : 'rgba(255,255,255,0.08)',
               transition: 'background 0.3s ease',
             }} />
           )
         })}
-        <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: 5 }}>
+        <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginLeft: 5 }}>
           {completedSessions} session{completedSessions !== 1 ? 's' : ''} done
         </span>
       </div>
@@ -360,6 +371,122 @@ export default function PomodoroSection({ settings, setSettings, focusTopic, set
                 </label>
               ))}
             </div>
+
+            {/* Divider */}
+            <div style={{ borderTop: '1px solid var(--border)', margin: '18px 0' }} />
+
+            {/* Background picker */}
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 12 }}>
+              Background
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              {([
+                ['none', 'None', ''],
+                ['starfield', 'Starfield', '✦'],
+                ['pixel-galaxy', 'Galaxy', '◆'],
+                ['fractal', 'Fractal', '∞'],
+                ['evolving-shapes', 'Shapes', '◇'],
+                ['custom-image', 'Image', '◻'],
+              ] as [PomBgType, string, string][]).map(([bgType, label, icon]) => (
+                <button
+                  key={bgType}
+                  onClick={() => setSettings(c => ({ ...c, bgType }))}
+                  style={{
+                    background: settings.bgType === bgType ? 'var(--accent-surface)' : 'var(--bg-elevated)',
+                    border: `1px solid ${settings.bgType === bgType ? 'var(--accent)' : 'var(--border)'}`,
+                    borderRadius: 10,
+                    padding: '10px 6px',
+                    color: settings.bgType === bgType ? 'var(--accent-light)' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    fontFamily: 'inherit',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 4,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <span style={{ fontSize: '1rem' }}>{icon}</span>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Speed/density sliders for procedural backgrounds */}
+            {settings.bgType && settings.bgType !== 'none' && settings.bgType !== 'custom-image' && (
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', minWidth: 52 }}>Speed</span>
+                  <input
+                    type="range" min={10} max={200} step={10}
+                    value={(settings.bgParams?.speed || 0.5) * 100}
+                    onChange={e => setSettings(c => ({ ...c, bgParams: { ...c.bgParams, speed: Number(e.target.value) / 100 } }))}
+                    style={{ flex: 1, accentColor: 'var(--accent)' }}
+                  />
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', minWidth: 52 }}>Density</span>
+                  <input
+                    type="range" min={20} max={300} step={10}
+                    value={settings.bgParams?.density || 100}
+                    onChange={e => setSettings(c => ({ ...c, bgParams: { ...c.bgParams, density: Number(e.target.value) } }))}
+                    style={{ flex: 1, accentColor: 'var(--accent)' }}
+                  />
+                </label>
+              </div>
+            )}
+
+            {/* Image source for custom-image */}
+            {settings.bgType === 'custom-image' && (
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  const reader = new FileReader()
+                  reader.onload = () => setSettings(c => ({ ...c, bgImageSrc: reader.result as string }))
+                  reader.readAsDataURL(file)
+                }} />
+                <button onClick={() => fileInputRef.current?.click()} style={{
+                  ...numberInput, width: '100%', cursor: 'pointer', textAlign: 'center',
+                  fontWeight: 600, fontSize: '0.78rem', color: 'var(--text-secondary)',
+                }}>
+                  Upload Image...
+                </button>
+                <input
+                  type="text"
+                  placeholder="Or paste image URL..."
+                  value={settings.bgImageSrc?.startsWith('data:') ? '' : (settings.bgImageSrc || '')}
+                  onChange={e => setSettings(c => ({ ...c, bgImageSrc: e.target.value }))}
+                  style={{ ...numberInput, width: '100%' }}
+                />
+                {artefacts.length > 0 && (
+                  <>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700, marginTop: 4 }}>
+                      Or use an artefact
+                    </div>
+                    <div style={{ maxHeight: 120, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {artefacts.map(a => (
+                        <button key={a.id} onClick={() => {
+                          // For HTML/React artefacts, we create a data URL from the code rendered as a blob
+                          // For now, set artefact ID so PomodoroBackground can render it
+                          setSettings(c => ({ ...c, bgImageSrc: `artefact:${a.id}` }))
+                        }} style={{
+                          background: settings.bgImageSrc === `artefact:${a.id}` ? 'var(--accent-surface)' : 'var(--bg-input)',
+                          border: `1px solid ${settings.bgImageSrc === `artefact:${a.id}` ? 'var(--accent)' : 'var(--border)'}`,
+                          borderRadius: 8, padding: '7px 10px', color: 'var(--text-secondary)',
+                          cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600,
+                          fontFamily: 'inherit', textAlign: 'left',
+                        }}>
+                          {a.title} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({a.type})</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -380,8 +507,6 @@ const primaryButton: CSSProperties = {
 }
 
 const secondaryButton: CSSProperties = {
-  background: 'var(--bg-elevated)',
-  border: '1px solid var(--border)',
   borderRadius: 11,
   padding: '11px 22px',
   color: 'var(--text-secondary)',
