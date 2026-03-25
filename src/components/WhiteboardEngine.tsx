@@ -3,6 +3,7 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
 import type { WBItem, WBSticky, WBTextbox, WBShape, WBImage, Board, BoardIndex } from '../lib/types'
 import { uid, WB_SIZE, STICKY_COLORS, PEN_COLORS, arrPts } from '../lib/helpers'
 import * as storage from '../lib/storage'
+import SurfaceFrame from './SurfaceFrame'
 
 const WB_TOOLS = [
   { id: 'select', label: 'Select / Pan', icon: 'M5 3l14 9-7 1-3 7z' },
@@ -785,17 +786,20 @@ export default function WhiteboardEngine({ scope, title }: Props) {
 
   return (
     <div style={{ flex: 1, width: '100%', minWidth: 0, display: 'flex', height: '100%', minHeight: 0, overflow: 'hidden' }}>
-      <div style={{
-        width: sbCollapsed ? 32 : sbW,
-        flexShrink: 0,
-        borderRight: '1px solid var(--border)',
-        display: 'flex',
-        flexDirection: 'column',
-        background: 'var(--bg-sidebar)',
-        minHeight: 0,
-        position: 'relative',
-        transition: sbDragging.current ? 'none' : 'width 0.15s',
-      }}>
+      <SurfaceFrame
+        targetId="panel:whiteboard-sidebar"
+        role="panel"
+        glass="panel"
+        style={{
+          width: sbCollapsed ? 32 : sbW,
+          flexShrink: 0,
+          borderRight: '1px solid var(--border)',
+          minHeight: 0,
+          position: 'relative',
+          transition: sbDragging.current ? 'none' : 'width 0.15s',
+        }}
+        contentStyle={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0, position: 'relative' }}
+      >
         {/* Collapse toggle */}
         <button
           type="button"
@@ -913,7 +917,7 @@ export default function WhiteboardEngine({ scope, title }: Props) {
             }}
           />
         )}
-      </div>
+      </SurfaceFrame>
 
       {!activeBoardId ? (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: '0.9rem' }}>
@@ -1397,15 +1401,17 @@ const popover: CSSProperties = {
   position: 'absolute',
   top: 'calc(100% + 6px)',
   left: 0,
-  zIndex: 50,
-  background: 'var(--bg-surface)',
-  border: '1px solid var(--border)',
+  zIndex: 'var(--z-popover)',
+  background: 'var(--glass-popup-bg)',
+  border: '1px solid var(--glass-popup-border)',
   borderRadius: 12,
   padding: 10,
   display: 'flex',
   gap: 8,
   boxShadow: 'var(--shadow-lg)',
   whiteSpace: 'nowrap',
+  backdropFilter: 'blur(var(--glass-popup-blur)) saturate(var(--glass-popup-saturate))',
+  WebkitBackdropFilter: 'blur(var(--glass-popup-blur)) saturate(var(--glass-popup-saturate))',
 }
 
 const ghostChip: CSSProperties = {

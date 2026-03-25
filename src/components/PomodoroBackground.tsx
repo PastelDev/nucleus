@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
-import type { PomBgType, Artefact } from '../lib/types'
+import type { Artefact, PomodoroSettings } from '../lib/types'
+
+type PomBgType = NonNullable<PomodoroSettings['bgType']>
 
 interface Props {
   type: PomBgType

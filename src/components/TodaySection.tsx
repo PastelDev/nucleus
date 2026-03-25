@@ -32,7 +32,14 @@ export default function TodaySection({ tasks, setTasks, events, setSection }: Pr
   useEffect(() => {
     const cacheKey = 'nucleus-apod-img-' + new Date().toISOString().slice(0, 10)
     const cached = localStorage.getItem(cacheKey)
-    if (cached) { setApod(JSON.parse(cached)); return }
+    if (cached) {
+      try {
+        setApod(JSON.parse(cached))
+        return
+      } catch {
+        localStorage.removeItem(cacheKey)
+      }
+    }
     // Clean up old cached keys
     Object.keys(localStorage).filter(k => k.startsWith('nucleus-apod') && k !== cacheKey).forEach(k => localStorage.removeItem(k))
     // Fetch APOD, if video with no thumbnail try previous days until we find an image

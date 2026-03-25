@@ -93,7 +93,7 @@ export default function FloatingClock({ visible, onClose }: Props) {
 
   return (
     <div
-      className="liquid-glass"
+      className="glass-surface glass-floating"
       onMouseDown={onMouseDown}
       style={{
         position: 'fixed',
@@ -101,7 +101,7 @@ export default function FloatingClock({ visible, onClose }: Props) {
         top: persisted.y,
         width: w,
         height: h,
-        zIndex: 9999,
+        zIndex: 'var(--z-floating)',
         borderRadius: 16,
         cursor: 'grab',
         display: 'flex',

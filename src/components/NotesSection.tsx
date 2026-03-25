@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Note } from '../lib/types'
 import { uid } from '../lib/helpers'
 import Markdown from './Markdown'
+import SurfaceFrame from './SurfaceFrame'
 
 interface Props {
   notes: Note[]
@@ -43,10 +44,18 @@ export default function NotesSection({ notes, setNotes }: Props) {
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
       {/* Sidebar list */}
-      <div style={{
-        width: 248, flexShrink: 0, borderRight: '1px solid var(--border)',
-        display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-sidebar)',
-      }}>
+      <SurfaceFrame
+        targetId="panel:notes-sidebar"
+        role="panel"
+        glass="panel"
+        style={{
+          width: 268,
+          flexShrink: 0,
+          borderRight: '1px solid var(--border)',
+          overflow: 'hidden',
+        }}
+        contentStyle={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+      >
         <div style={{ padding: '20px 14px 10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <span style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '0.95rem', fontFamily: 'var(--font-heading)' }}>Notes</span>
@@ -111,7 +120,7 @@ export default function NotesSection({ notes, setNotes }: Props) {
             </div>
           ))}
         </div>
-      </div>
+      </SurfaceFrame>
 
       {/* Note detail */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -135,9 +144,15 @@ export default function NotesSection({ notes, setNotes }: Props) {
                 <input
                   value={sel.title} onChange={e => upd(sel.id, { title: e.target.value })}
                   style={{
-                    flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                    flex: 1,
+                    background: 'color-mix(in srgb, var(--accent-surface) 82%, transparent)',
+                    border: '1px solid var(--border-focus)',
+                    borderRadius: 14,
+                    outline: 'none',
+                    padding: '12px 14px',
                     fontSize: '1.7rem', fontWeight: 800, color: 'var(--text-primary)',
                     letterSpacing: '-0.03em', fontFamily: 'var(--font-heading)',
+                    boxShadow: '0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent)',
                   }}
                 />
               ) : (
@@ -194,9 +209,10 @@ export default function NotesSection({ notes, setNotes }: Props) {
                 placeholder="Start writing...\n\n# Heading\n## Sub heading\n**bold**  *italic*  `code`\n- list item\n- [ ] task\n- [x] done task"
                 style={{
                   width: '100%', minHeight: 420, background: 'var(--bg-input)',
-                  border: '1px solid var(--border)', borderRadius: 12, padding: 18,
+                  border: '1px solid var(--border-focus)', borderRadius: 16, padding: 18,
                   color: 'var(--text-secondary)', fontSize: '0.92rem', fontFamily: 'inherit',
                   lineHeight: 1.8, outline: 'none', resize: 'vertical', boxSizing: 'border-box',
+                  boxShadow: '0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent)',
                 }}
               />
             ) : (

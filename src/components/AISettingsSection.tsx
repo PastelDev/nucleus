@@ -198,7 +198,7 @@ export default function AISettingsSection({
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
           {memEdit ? (
             <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={() => { setMemoriesMd(memBuf); setMemEdit(false); store.saveMD('ai-memories.md', memBuf) }} style={{ ...saveBtn, background: 'var(--green)' }}>Save</button>
+              <button onClick={() => { setMemoriesMd(memBuf); setMemEdit(false); store.saveAgentMemorySummary(memBuf, true) }} style={{ ...saveBtn, background: 'var(--green)' }}>Save</button>
               <button onClick={() => { setMemBuf(memoriesMd); setMemEdit(false) }} style={cancelBtn}>Cancel</button>
             </div>
           ) : <button onClick={() => { setMemBuf(memoriesMd); setMemEdit(true) }} style={editBtn}>Edit</button>}
@@ -207,6 +207,9 @@ export default function AISettingsSection({
           ? <textarea value={memBuf} onChange={e => setMemBuf(e.target.value)} style={mdArea} />
           : <pre style={mdPre}>{memoriesMd}</pre>
         }
+        <div style={{ fontSize: '0.68rem', color: 'var(--text-faint)', marginTop: 8 }}>
+          Stored in `data/user/memories/agent/index.md` with dated updates in `data/user/memories/agent/log/`.
+        </div>
       </Section>
 
       {/* Live context snapshot */}

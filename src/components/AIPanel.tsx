@@ -1,15 +1,20 @@
 import { useState, useEffect, useRef } from 'react'
-import type { Note, CalendarEvent, Task, PomodoroSettings, Section, AIConfig, Artefact } from '../lib/types'
+import type { Note, CalendarEvent, Task, PomodoroSettings, Section, AIConfig, Artefact, BackgroundPreset, BoardCollection, BoardScope } from '../lib/types'
 import { uid, today } from '../lib/helpers'
 import * as store from '../lib/storage'
 import { listEventOccurrencesInRange, recurrenceLabel } from '../lib/calendar'
+import { SURFACE_TARGET_OPTIONS, getSurfaceRole } from '../lib/theme'
 import Markdown from './Markdown'
 import NucleusLogo from './NucleusLogo'
 import ThinkingBlock from './ThinkingBlock'
+import SurfaceFrame from './SurfaceFrame'
+import { useAppearance } from './AppearanceProvider'
+
+const SURFACE_TARGET_IDS = SURFACE_TARGET_OPTIONS.map((entry) => entry.id)
 
 /* ── Tool definitions ── */
 const AI_TOOLS = [
-  { type: 'function', function: { name: 'navigate_to', description: 'Switch to a different section of the app', parameters: { type: 'object', properties: { section: { type: 'string', enum: ['today', 'notes', 'whiteboard', 'me', 'calendar', 'pomodoro', 'ai-settings', 'artefacts'] } }, required: ['section'] } } },
+  { type: 'function', function: { name: 'navigate_to', description: 'Switch to a different section of the app', parameters: { type: 'object', properties: { section: { type: 'string', enum: ['today', 'notes', 'boards', 'memories', 'calendar', 'pomodoro', 'ai-settings', 'artefacts'] } }, required: ['section'] } } },
   { type: 'function', function: { name: 'create_calendar_event', description: 'Create a new event on the calendar, optionally recurring daily, weekly, or yearly.', parameters: { type: 'object', properties: { title: { type: 'string' }, date: { type: 'string', description: 'YYYY-MM-DD' }, time: { type: 'string' }, color: { type: 'string' }, recurrence: { type: 'string', enum: ['none', 'daily', 'weekly', 'yearly'] } }, required: ['title', 'date'] } } },
   { type: 'function', function: { name: 'set_pomodoro', description: 'Configure Pomodoro timer durations', parameters: { type: 'object', properties: { work_minutes: { type: 'number' }, short_break_minutes: { type: 'number' }, long_break_minutes: { type: 'number' }, rounds_count: { type: 'number' }, navigate: { type: 'boolean' } } } } },
   { type: 'function', function: { name: 'create_note', description: 'Create a new note with markdown content', parameters: { type: 'object', properties: { title: { type: 'string' }, content: { type: 'string' }, tags: { type: 'array', items: { type: 'string' } } }, required: ['title', 'content'] } } },
@@ -19,10 +24,10 @@ const AI_TOOLS = [
   { type: 'function', function: { name: 'read_note', description: 'Read the full content of a specific note by ID', parameters: { type: 'object', properties: { note_id: { type: 'string' } }, required: ['note_id'] } } },
   { type: 'function', function: { name: 'get_all_tasks', description: 'Get tasks filtered by date range', parameters: { type: 'object', properties: { date_from: { type: 'string', description: 'YYYY-MM-DD, optional' }, date_to: { type: 'string', description: 'YYYY-MM-DD, optional' } } } } },
   { type: 'function', function: { name: 'get_all_events', description: 'Get calendar events filtered by date range', parameters: { type: 'object', properties: { date_from: { type: 'string' }, date_to: { type: 'string' } } } } },
-  { type: 'function', function: { name: 'read_board', description: 'Read items from a whiteboard or Me sub-board', parameters: { type: 'object', properties: { scope: { type: 'string', enum: ['whiteboards', 'me'] }, board_id: { type: 'string' } }, required: ['scope', 'board_id'] } } },
+  { type: 'function', function: { name: 'read_board', description: 'Read items from a board by ID.', parameters: { type: 'object', properties: { board_id: { type: 'string' } }, required: ['board_id'] } } },
   { type: 'function', function: { name: 'update_memories', description: 'Update agent memories with important context', parameters: { type: 'object', properties: { content: { type: 'string' } }, required: ['content'] } } },
-  { type: 'function', function: { name: 'generate_image', description: 'Generate image(s) with OpenAI gpt-image-1. User will preview before placement. Requires OpenAI key.', parameters: { type: 'object', properties: { prompt: { type: 'string' }, size: { type: 'string', enum: ['1024x1024', '1536x1024', '1024x1536'] }, quality: { type: 'string', enum: ['low', 'medium', 'high', 'auto'] }, n: { type: 'integer', minimum: 1, maximum: 4 }, scope: { type: 'string', enum: ['whiteboards', 'me'] }, board_id: { type: 'string' }, include_in_context: { type: 'boolean', description: 'If true and model supports vision, pass generated images back as AI context so you can see them' }, reference_path: { type: 'string', description: 'Path of a previously generated image to use as visual reference for generation' }, use_uploaded_references: { type: 'boolean', description: "Use the user's most recently uploaded images as generation reference (works even without vision)" }, use_previous_generation: { type: 'boolean', description: 'Use the most recently generated images as reference for iteration' } }, required: ['prompt'] } } },
-  { type: 'function', function: { name: 'generate_images_batch', description: 'Generate multiple images from different prompts. User will preview before placement.', parameters: { type: 'object', properties: { prompts: { type: 'array', items: { type: 'string' } }, size: { type: 'string', enum: ['1024x1024', '1536x1024', '1024x1536'] }, quality: { type: 'string', enum: ['low', 'medium', 'high', 'auto'] }, scope: { type: 'string', enum: ['whiteboards', 'me'] }, board_id: { type: 'string' }, include_in_context: { type: 'boolean', description: 'If true and model supports vision, pass generated images back as AI context so you can see them' }, reference_path: { type: 'string', description: 'Path of a previously generated image to use as visual reference' }, use_uploaded_references: { type: 'boolean', description: "Use the user's most recently uploaded images as generation reference" }, use_previous_generation: { type: 'boolean', description: 'Use the most recently generated images as reference for iteration' } }, required: ['prompts'] } } },
+  { type: 'function', function: { name: 'generate_image', description: 'Generate image(s) with OpenAI gpt-image-1. User will preview before placement. Requires OpenAI key.', parameters: { type: 'object', properties: { prompt: { type: 'string' }, size: { type: 'string', enum: ['1024x1024', '1536x1024', '1024x1536'] }, quality: { type: 'string', enum: ['low', 'medium', 'high', 'auto'] }, n: { type: 'integer', minimum: 1, maximum: 4 }, collection: { type: 'string', enum: ['boards', 'personal'] }, board_id: { type: 'string' }, include_in_context: { type: 'boolean', description: 'If true and model supports vision, pass generated images back as AI context so you can see them' }, reference_path: { type: 'string', description: 'Path of a previously generated image to use as visual reference for generation' }, use_uploaded_references: { type: 'boolean', description: "Use the user's most recently uploaded images as generation reference (works even without vision)" }, use_previous_generation: { type: 'boolean', description: 'Use the most recently generated images as reference for iteration' } }, required: ['prompt'] } } },
+  { type: 'function', function: { name: 'generate_images_batch', description: 'Generate multiple images from different prompts. User will preview before placement.', parameters: { type: 'object', properties: { prompts: { type: 'array', items: { type: 'string' } }, size: { type: 'string', enum: ['1024x1024', '1536x1024', '1024x1536'] }, quality: { type: 'string', enum: ['low', 'medium', 'high', 'auto'] }, collection: { type: 'string', enum: ['boards', 'personal'] }, board_id: { type: 'string' }, include_in_context: { type: 'boolean', description: 'If true and model supports vision, pass generated images back as AI context so you can see them' }, reference_path: { type: 'string', description: 'Path of a previously generated image to use as visual reference' }, use_uploaded_references: { type: 'boolean', description: "Use the user's most recently uploaded images as generation reference" }, use_previous_generation: { type: 'boolean', description: 'Use the most recently generated images as reference for iteration' } }, required: ['prompts'] } } },
   { type: 'function', function: { name: 'create_artefact', description: 'Create a new HTML or React (JSX) artefact in the Artefacts panel. Use type "html" for plain HTML/CSS/JS and "react" for JSX components (exports a default App component).', parameters: { type: 'object', properties: { title: { type: 'string' }, type: { type: 'string', enum: ['html', 'react'] }, code: { type: 'string', description: 'Full HTML document or React JSX code. For react, write a function App() {} and export it as default or just define it — it will be rendered automatically.' }, artefact_id: { type: 'string', description: 'ID of an existing artefact to update instead of creating new' } }, required: ['title', 'type', 'code'] } } },
   { type: 'function', function: { name: 'delete_note', description: 'Permanently delete a note by ID', parameters: { type: 'object', properties: { note_id: { type: 'string' } }, required: ['note_id'] } } },
   { type: 'function', function: { name: 'delete_event', description: 'Permanently delete a calendar event by ID', parameters: { type: 'object', properties: { event_id: { type: 'string' } }, required: ['event_id'] } } },
@@ -31,11 +36,15 @@ const AI_TOOLS = [
   { type: 'function', function: { name: 'set_focus_topic', description: 'Set the focus topic for the Pomodoro timer', parameters: { type: 'object', properties: { topic: { type: 'string' } }, required: ['topic'] } } },
   { type: 'function', function: { name: 'set_prevent_sleep', description: 'Enable or disable screen sleep prevention', parameters: { type: 'object', properties: { enabled: { type: 'boolean' } }, required: ['enabled'] } } },
   { type: 'function', function: { name: 'capture_screen', description: 'Capture a screenshot of all screens', parameters: { type: 'object', properties: {} } } },
-  { type: 'function', function: { name: 'create_board', description: 'Create a new whiteboard or Me sub-board', parameters: { type: 'object', properties: { scope: { type: 'string', enum: ['whiteboards', 'me'] }, name: { type: 'string' } }, required: ['scope', 'name'] } } },
+  { type: 'function', function: { name: 'create_board', description: 'Create a new board in the shared Boards area.', parameters: { type: 'object', properties: { collection: { type: 'string', enum: ['boards', 'personal'] }, name: { type: 'string' } }, required: ['name'] } } },
   { type: 'function', function: { name: 'read_artefact', description: 'Read the full code of an artefact by ID', parameters: { type: 'object', properties: { artefact_id: { type: 'string' } }, required: ['artefact_id'] } } },
   { type: 'function', function: { name: 'delete_artefact', description: 'Permanently delete an artefact by ID', parameters: { type: 'object', properties: { artefact_id: { type: 'string' } }, required: ['artefact_id'] } } },
   { type: 'function', function: { name: 'toggle_clock', description: 'Show or hide the floating clock', parameters: { type: 'object', properties: { visible: { type: 'boolean' } }, required: ['visible'] } } },
-  { type: 'function', function: { name: 'set_pomodoro_background', description: 'Change the Pomodoro timer background animation. For custom-image type, provide image_src (URL) or artefact_id to use an artefact as background.', parameters: { type: 'object', properties: { type: { type: 'string', enum: ['none', 'starfield', 'pixel-galaxy', 'fractal', 'evolving-shapes', 'custom-image'] }, speed: { type: 'number', description: 'Animation speed 0.1–2.0' }, density: { type: 'number', description: 'Element count/density 20–300' }, image_src: { type: 'string', description: 'Image URL for custom-image type' }, artefact_id: { type: 'string', description: 'ID of an artefact to use as background (sets type to custom-image automatically)' } }, required: ['type'] } } },
+  { type: 'function', function: { name: 'list_background_presets', description: 'List available background presets and surface targets.', parameters: { type: 'object', properties: {} } } },
+  { type: 'function', function: { name: 'preview_surface_background', description: 'Preview a background on a specific app surface without saving it yet.', parameters: { type: 'object', properties: { surface_target: { type: 'string', enum: SURFACE_TARGET_IDS }, preset_id: { type: 'string' }, name: { type: 'string' }, kind: { type: 'string', enum: ['gradient', 'simulation', 'media', 'artefact'] }, style: { type: 'string', enum: ['theme-orbit', 'theme-rings', 'theme-mesh'] }, engine: { type: 'string', enum: ['starfield', 'linked-particles', 'game-of-life', 'evolving-shapes'] }, media_src: { type: 'string' }, media_type: { type: 'string', enum: ['image', 'video'] }, artefact_id: { type: 'string' }, opacity: { type: 'number' }, blur: { type: 'number' }, blend_mode: { type: 'string', enum: ['normal', 'screen', 'overlay', 'soft-light', 'lighten'] }, speed: { type: 'number' }, density: { type: 'number' } }, required: ['surface_target'] } } },
+  { type: 'function', function: { name: 'save_background_preset', description: 'Persist the currently previewed background preset after approval.', parameters: { type: 'object', properties: { preview_id: { type: 'string' }, name: { type: 'string' } }, required: ['preview_id'] } } },
+  { type: 'function', function: { name: 'assign_surface_background', description: 'Assign an existing background preset to a page, panel, popup, or the app shell.', parameters: { type: 'object', properties: { surface_target: { type: 'string', enum: SURFACE_TARGET_IDS }, preset_id: { type: 'string' }, opacity: { type: 'number' }, blur: { type: 'number' } }, required: ['surface_target'] } } },
+  { type: 'function', function: { name: 'update_background_params', description: 'Update either a saved preset or the currently previewed background draft.', parameters: { type: 'object', properties: { preview_id: { type: 'string' }, preset_id: { type: 'string' }, name: { type: 'string' }, opacity: { type: 'number' }, blur: { type: 'number' }, blend_mode: { type: 'string', enum: ['normal', 'screen', 'overlay', 'soft-light', 'lighten'] }, style: { type: 'string', enum: ['theme-orbit', 'theme-rings', 'theme-mesh'] }, engine: { type: 'string', enum: ['starfield', 'linked-particles', 'game-of-life', 'evolving-shapes'] }, media_src: { type: 'string' }, media_type: { type: 'string', enum: ['image', 'video'] }, artefact_id: { type: 'string' }, speed: { type: 'number' }, density: { type: 'number' } } } } },
 ]
 
 /* ── Context builder ── */
@@ -65,10 +74,12 @@ interface ChatSession {
 
 /* ── Message types ── */
 interface Msg {
-  role: 'user' | 'assistant' | 'tool_call' | 'image_preview'
+  role: 'user' | 'assistant' | 'tool_call' | 'tool_denied' | 'image_preview'
   content: string
   toolName?: string
   toolArgs?: Record<string, unknown>
+  toolStatus?: 'running' | 'done' | 'denied'
+  toolReason?: string
   imagePaths?: string[]
   imageArgs?: Record<string, unknown>
   imageStatus?: 'inserted' | 'discarded' | 'iterating'
@@ -79,7 +90,7 @@ interface Msg {
 interface PendingApproval {
   toolName: string
   toolArgs: Record<string, unknown>
-  resolve: (approved: boolean) => void
+  resolve: (decision: { approved: boolean; reason?: string }) => void
 }
 
 interface PendingImg {
@@ -112,8 +123,19 @@ export default function AIPanel({
   setNotes, setEvents, setTasks, setArtefacts, setSection, setPomSettings,
   agentMd, memoriesMd, setMemoriesMd,
   aiConfig, focusTopic, setFocusTopic, preventSleep, setPreventSleep,
-  clockVisible, setClockVisible, onClose,
+  clockVisible: _clockVisible, setClockVisible, onClose,
 }: Props) {
+  const {
+    themeSettings,
+    preview,
+    previewSurface,
+    savePreview,
+    clearPreview,
+    assignSurface,
+    updatePreset,
+    findPreset,
+    resolveAssignment,
+  } = useAppearance()
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [apiMsgs, setApiMsgs] = useState<any[]>([])
   const [input, setInput] = useState('')
@@ -121,6 +143,8 @@ export default function AIPanel({
   const [streamingMsg, setStreamingMsg] = useState<string | null>(null)
   const [refImages, setRefImages] = useState<string[]>([])
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null)
+  const [approvalReason, setApprovalReason] = useState('')
+  const [approvalReasonChip, setApprovalReasonChip] = useState('')
   const [pendingImg, setPendingImg] = useState<PendingImg | null>(null)
   const [iterInput, setIterInput] = useState('')
   const [showCtx, setShowCtx] = useState(false)
@@ -192,11 +216,142 @@ export default function AIPanel({
   }, [aiConfig.model, aiConfig.apiKey])
 
   const activeTools = supportsVision ? AI_TOOLS : AI_TOOLS.filter(t => t.function.name !== 'capture_screen')
+  const approvalReasonChoices = ['Not now', 'Too risky', 'Need more context', 'Do it manually']
 
   const ctxText = genCtx(section, notes, events, tasks, pomSettings, artefacts)
     + (focusTopic ? `\n## Focus Session\nFocusing on: "${focusTopic}"\n` : '')
     + `\nPrevent sleep: ${preventSleep}\n`
     + (uploadedRefsRef.current.length > 0 ? `\n## Uploaded Reference Images\n${uploadedRefsRef.current.length} image(s) available — use use_uploaded_references: true in generate_image to use them as reference\n` : '')
+
+  const buildBackgroundPreset = (args: any): BackgroundPreset => {
+    if (args.kind === 'media' || args.media_src) {
+      return {
+        id: args.preset_id || `preview-${uid()}`,
+        name: args.name || 'Preview Media',
+        kind: 'media',
+        opacity: args.opacity ?? 0.92,
+        blur: args.blur ?? 0,
+        blendMode: args.blend_mode || 'normal',
+        media: {
+          src: args.media_src || '',
+          mediaType: args.media_type || 'image',
+          fit: 'cover',
+          drift: 0.12,
+          muted: true,
+          loop: true,
+          playbackRate: 1,
+        },
+      }
+    }
+
+    if (args.kind === 'artefact' || args.artefact_id) {
+      return {
+        id: args.preset_id || `preview-${uid()}`,
+        name: args.name || 'Preview Artefact',
+        kind: 'artefact',
+        opacity: args.opacity ?? 0.88,
+        blur: args.blur ?? 0,
+        blendMode: args.blend_mode || 'normal',
+        artefact: {
+          artefactId: args.artefact_id || '',
+          scale: 1,
+          injectTheme: true,
+        },
+      }
+    }
+
+    if (args.kind === 'simulation' || args.engine) {
+      return {
+        id: args.preset_id || `preview-${uid()}`,
+        name: args.name || 'Preview Simulation',
+        kind: 'simulation',
+        opacity: args.opacity ?? 0.82,
+        blur: args.blur ?? 0,
+        blendMode: args.blend_mode || 'screen',
+        simulation: {
+          engine: args.engine || 'starfield',
+          speed: args.speed ?? 0.4,
+          density: args.density ?? 80,
+          detail: 0.5,
+        },
+      }
+    }
+
+    return {
+      id: args.preset_id || `preview-${uid()}`,
+      name: args.name || 'Preview Gradient',
+      kind: 'gradient',
+      opacity: args.opacity ?? 1,
+      blur: args.blur ?? 0,
+      blendMode: args.blend_mode || 'normal',
+      gradient: {
+        style: args.style || 'theme-orbit',
+        intensity: 0.74,
+        motion: args.speed ?? 0.58,
+        softness: 0.72,
+      },
+    }
+  }
+
+  const patchBackgroundPreset = (preset: BackgroundPreset, args: any): BackgroundPreset => {
+    const base = {
+      ...preset,
+      name: args.name ?? preset.name,
+      opacity: args.opacity ?? preset.opacity,
+      blur: args.blur ?? preset.blur,
+      blendMode: args.blend_mode ?? preset.blendMode,
+    }
+    if (base.kind === 'gradient') {
+      return {
+        ...base,
+        gradient: {
+          ...base.gradient,
+          style: args.style ?? base.gradient.style,
+          motion: args.speed ?? base.gradient.motion,
+        },
+      }
+    }
+    if (base.kind === 'simulation') {
+      return {
+        ...base,
+        simulation: {
+          ...base.simulation,
+          engine: args.engine ?? base.simulation.engine,
+          speed: args.speed ?? base.simulation.speed,
+          density: args.density ?? base.simulation.density,
+        },
+      }
+    }
+    if (base.kind === 'media') {
+      return {
+        ...base,
+        media: {
+          ...base.media,
+          src: args.media_src ?? base.media.src,
+          mediaType: args.media_type ?? base.media.mediaType,
+        },
+      }
+    }
+    return {
+      ...base,
+      artefact: {
+        ...base.artefact,
+        artefactId: args.artefact_id ?? base.artefact.artefactId,
+      },
+    }
+  }
+
+  const hasPresetPatch = (args: any) => (
+    args.name !== undefined
+    || args.blend_mode !== undefined
+    || args.style !== undefined
+    || args.engine !== undefined
+    || args.media_src !== undefined
+    || args.media_type !== undefined
+    || args.artefact_id !== undefined
+    || args.speed !== undefined
+    || args.density !== undefined
+  )
 
   /* ── Permission check ── */
   const needsApproval = (name: string) => {
@@ -206,8 +361,18 @@ export default function AIPanel({
     return !aiConfig.permCustom?.[name]
   }
 
-  const requestApproval = (name: string, args: Record<string, unknown>): Promise<boolean> =>
-    new Promise(resolve => setPendingApproval({ toolName: name, toolArgs: args, resolve }))
+  const requestApproval = (name: string, args: Record<string, unknown>): Promise<{ approved: boolean; reason?: string }> =>
+    new Promise(resolve => {
+      setApprovalReason('')
+      setApprovalReasonChip('')
+      setPendingApproval({ toolName: name, toolArgs: args, resolve })
+    })
+
+  const resolveBoardScopeForArgs = async (args: { collection?: BoardCollection; board_id?: string }): Promise<BoardScope | null> => {
+    if (args.collection) return store.boardCollectionToScope(args.collection)
+    if (!args.board_id) return null
+    return store.resolveBoardScope(args.board_id)
+  }
 
   /* ── Image generation + preview ── */
   const generateAndPreview = async (args: any, isBatch: boolean): Promise<any> => {
@@ -220,7 +385,8 @@ export default function AIPanel({
       }
       if (isBatch) payload.prompts = args.prompts
       else { payload.prompt = args.prompt; payload.n = args.n || 1 }
-      if (args.scope && args.board_id) { payload.scope = args.scope; payload.board_id = args.board_id }
+      const boardScope = await resolveBoardScopeForArgs(args)
+      if (boardScope && args.board_id) { payload.scope = boardScope; payload.board_id = args.board_id }
       if (args.reference_path) payload.reference_paths = [args.reference_path]
       // Auto-reference last generated images if iterating
       if (args.use_previous_generation && lastGeneratedPathsRef.current.length > 0) {
@@ -266,17 +432,17 @@ export default function AIPanel({
         return { ok: true, placed: false, message: 'Images discarded by user', ...nonVisionInfo }
       }
 
-      if (action.type === 'insert' && args.scope && args.board_id) {
+      if (action.type === 'insert' && boardScope && args.board_id) {
         setMsgs(p => p.map((m, i) => i === imgMsgIdxRef.current ? { ...m, imageStatus: 'inserted' } : m))
-        const board = await store.loadBoard(args.scope as 'whiteboards' | 'me', args.board_id)
+        const board = await store.loadBoard(boardScope, args.board_id)
         if (board) {
           const newImgs = (data.paths as string[]).map((src, i) => ({
             id: uid(), type: 'image' as const, x: 200 + i * 540, y: 200, w: 512, h: 512, src, name: `AI Image ${i + 1}`,
           }))
-          await store.saveBoard(args.scope as 'whiteboards' | 'me', { ...board, items: [...board.items, ...newImgs], updatedAt: Date.now() });
-          (window as any).__nucleusSelectBoard = { scope: args.scope, boardId: args.board_id }
-          setSection(args.scope === 'me' ? 'me' : 'whiteboard')
-          window.dispatchEvent(new CustomEvent('nucleus:select-board', { detail: { scope: args.scope, boardId: args.board_id } }))
+          await store.saveBoard(boardScope, { ...board, items: [...board.items, ...newImgs], updatedAt: Date.now() });
+          ;(window as any).__nucleusSelectBoard = { scope: boardScope, boardId: args.board_id }
+          setSection('boards')
+          window.dispatchEvent(new CustomEvent('nucleus:select-board', { detail: { scope: boardScope, boardId: args.board_id } }))
         }
         return { ok: true, placed: true, paths: data.paths, count: data.paths.length, ...nonVisionInfo, ...(ctxImages ? { _context_images: ctxImages } : {}) }
       }
@@ -300,9 +466,18 @@ export default function AIPanel({
   /* ── Tool executor ── */
   const exec = async (name: string, args: any): Promise<any> => {
     if (needsApproval(name)) {
-      const approved = await requestApproval(name, args)
+      const decision = await requestApproval(name, args)
       setPendingApproval(null)
-      if (!approved) return { error: 'Denied by user' }
+      setApprovalReason('')
+      setApprovalReasonChip('')
+      if (!decision.approved) {
+        return {
+          error: 'Denied by user',
+          denied: true,
+          reason: decision.reason || null,
+          next_step: 'Acknowledge the denial, explain what you can do instead, and ask one short follow-up only if you still need something from the user.',
+        }
+      }
     }
 
     switch (name) {
@@ -366,10 +541,15 @@ export default function AIPanel({
         }
       }
       case 'read_board': {
-        const board = await store.loadBoard(args.scope as 'whiteboards' | 'me', args.board_id)
-        return board ? { id: board.id, name: board.name, items: board.items } : { error: 'Board not found' }
+        const resolved = await store.loadBoardById(args.board_id)
+        return resolved
+          ? { id: resolved.board.id, name: resolved.board.name, items: resolved.board.items, collection: store.boardScopeToCollection(resolved.scope) }
+          : { error: 'Board not found' }
       }
-      case 'update_memories': setMemoriesMd(args.content); return { ok: true }
+      case 'update_memories':
+        setMemoriesMd(args.content)
+        await store.saveAgentMemorySummary(args.content, true)
+        return { ok: true }
       case 'generate_image': return generateAndPreview(args, false)
       case 'generate_images_batch': return generateAndPreview(args, true)
       case 'create_artefact': {
@@ -417,12 +597,14 @@ export default function AIPanel({
       case 'create_board': {
         const boardId = uid()
         const newBoard = { id: boardId, name: args.name, items: [], createdAt: Date.now(), updatedAt: Date.now() }
-        const index = await store.loadBoardIndex(args.scope as 'whiteboards' | 'me')
-        await store.saveBoardIndex(args.scope as 'whiteboards' | 'me', { ...index, boards: [...index.boards, { id: boardId, name: args.name }] })
-        await store.saveBoard(args.scope as 'whiteboards' | 'me', newBoard)
-        setSection(args.scope === 'me' ? 'me' : 'whiteboard')
-        window.dispatchEvent(new CustomEvent('nucleus:select-board', { detail: { scope: args.scope, boardId } }))
-        return { ok: true, board_id: boardId, name: args.name }
+        const collection = (args.collection as BoardCollection | undefined) || 'boards'
+        const scope = store.boardCollectionToScope(collection)
+        const index = await store.loadBoardIndex(scope)
+        await store.saveBoardIndex(scope, { ...index, boards: [...index.boards, { id: boardId, name: args.name }] })
+        await store.saveBoard(scope, newBoard)
+        setSection('boards')
+        window.dispatchEvent(new CustomEvent('nucleus:select-board', { detail: { scope, boardId } }))
+        return { ok: true, board_id: boardId, name: args.name, collection }
       }
       case 'read_artefact': {
         const a = artefacts.find(x => x.id === args.artefact_id)
@@ -434,20 +616,127 @@ export default function AIPanel({
         return found ? { ok: true } : { error: 'Artefact not found' }
       }
       case 'toggle_clock': setClockVisible(!!args.visible); return { ok: true, visible: !!args.visible }
-      case 'set_pomodoro_background': {
-        const bgParams: Record<string, number> = {}
-        if (args.speed) bgParams.speed = args.speed
-        if (args.density) bgParams.density = args.density
-        const bgType = args.artefact_id ? 'custom-image' : args.type
-        const bgImageSrc = args.artefact_id ? `artefact:${args.artefact_id}` : args.image_src
-        setPomSettings(p => ({
-          ...p,
-          bgType,
-          bgParams: { ...p.bgParams, ...bgParams },
-          ...(bgImageSrc ? { bgImageSrc } : {}),
-        }))
-        if (bgType !== 'none') setSection('pomodoro')
-        return { ok: true, bgType }
+      case 'list_background_presets': {
+        return {
+          presets: themeSettings.backgroundPresets.map((preset) => ({
+            id: preset.id,
+            name: preset.name,
+            kind: preset.kind,
+          })),
+          surface_targets: SURFACE_TARGET_OPTIONS.map((target) => {
+            const assignment = resolveAssignment(target.id, target.role)
+            return {
+              id: target.id,
+              label: target.label,
+              role: target.role,
+              current_preset_id: assignment.presetId,
+              has_override: !!themeSettings.surfaceOverrides[target.id],
+            }
+          }),
+          preview: preview ? {
+            preview_id: preview.previewId,
+            surface_target: preview.targetId,
+            preset_id: preview.preset?.id ?? preview.assignment.presetId,
+            name: preview.preset?.name ?? findPreset(preview.assignment.presetId)?.name ?? null,
+          } : null,
+        }
+      }
+      case 'preview_surface_background': {
+        const targetId = args.surface_target
+        const role = getSurfaceRole(targetId)
+        const currentAssignment = resolveAssignment(targetId, role)
+        const previewId = preview && preview.targetId === targetId ? preview.previewId : `preview-${uid()}`
+
+        let draftPreset: BackgroundPreset | null = null
+        let presetId: string | null = null
+
+        if (args.preset_id) {
+          const existingPreset = findPreset(args.preset_id)
+          if (!existingPreset) return { error: 'Preset not found' }
+          presetId = existingPreset.id
+          draftPreset = hasPresetPatch(args) ? patchBackgroundPreset(existingPreset, args) : null
+        } else {
+          draftPreset = buildBackgroundPreset(args)
+          presetId = draftPreset.id
+        }
+
+        if (draftPreset) presetId = draftPreset.id
+
+        previewSurface({
+          previewId,
+          targetId,
+          role,
+          assignment: {
+            ...currentAssignment,
+            presetId,
+            opacity: typeof args.opacity === 'number' ? args.opacity : currentAssignment.opacity,
+            blur: typeof args.blur === 'number' ? args.blur : currentAssignment.blur,
+          },
+          preset: draftPreset,
+        })
+
+        return {
+          ok: true,
+          preview_id: previewId,
+          surface_target: targetId,
+          preset_id: presetId,
+          role,
+        }
+      }
+      case 'save_background_preset': {
+        if (!preview || preview.previewId !== args.preview_id) return { error: 'Preview not found' }
+        const saved = savePreview(args.name)
+        return saved ? {
+          ok: true,
+          preview_id: args.preview_id,
+          surface_target: saved.targetId,
+          preset_id: saved.preset?.id ?? saved.assignment.presetId,
+          name: saved.preset?.name ?? null,
+        } : { error: 'Preview not found' }
+      }
+      case 'assign_surface_background': {
+        const targetId = args.surface_target
+        const role = getSurfaceRole(targetId)
+        const currentAssignment = resolveAssignment(targetId, role)
+        const nextPresetId = args.preset_id ?? null
+        if (nextPresetId && !themeSettings.backgroundPresets.some((preset) => preset.id === nextPresetId)) {
+          return { error: 'Preset not found' }
+        }
+        assignSurface(targetId, {
+          ...currentAssignment,
+          presetId: nextPresetId,
+          opacity: typeof args.opacity === 'number' ? args.opacity : currentAssignment.opacity,
+          blur: typeof args.blur === 'number' ? args.blur : currentAssignment.blur,
+        })
+        if (preview?.targetId === targetId) clearPreview()
+        return {
+          ok: true,
+          surface_target: targetId,
+          preset_id: nextPresetId,
+        }
+      }
+      case 'update_background_params': {
+        if (args.preview_id) {
+          if (!preview || preview.previewId !== args.preview_id) return { error: 'Preview not found' }
+          const currentPreview = preview
+          const basePreset = preview.preset ?? findPreset(preview.assignment.presetId)
+          previewSurface({
+            ...currentPreview,
+            assignment: {
+              ...currentPreview.assignment,
+              opacity: typeof args.opacity === 'number' ? args.opacity : currentPreview.assignment.opacity,
+              blur: typeof args.blur === 'number' ? args.blur : currentPreview.assignment.blur,
+            },
+            preset: basePreset ? patchBackgroundPreset(basePreset, args) : currentPreview.preset,
+          })
+          return { ok: true, preview_id: args.preview_id }
+        }
+
+        if (!args.preset_id) return { error: 'Provide preview_id or preset_id' }
+        const preset = themeSettings.backgroundPresets.find((entry) => entry.id === args.preset_id)
+        if (!preset) return { error: 'Preset not found' }
+        updatePreset(args.preset_id, patchBackgroundPreset(preset, args))
+        return { ok: true, preset_id: args.preset_id }
       }
       default: return { error: `Unknown tool: ${name}` }
     }
@@ -549,15 +838,27 @@ export default function AIPanel({
         const results: any[] = []
         for (const tc of toolCalls) {
           let a: any; try { a = JSON.parse(tc.function.arguments) } catch { a = {} }
-          setMsgs(p => [...p, { role: 'tool_call', content: '', toolName: tc.function.name, toolArgs: a }])
+          let toolMsgIndex = -1
+          setMsgs(p => {
+            toolMsgIndex = p.length
+            return [...p, { role: 'tool_call', content: '', toolName: tc.function.name, toolArgs: a, toolStatus: 'running' }]
+          })
           const r = await exec(tc.function.name, a)
+          setMsgs(p => p.map((msg, idx) => idx === toolMsgIndex ? {
+            ...msg,
+            toolStatus: r.denied ? 'denied' : 'done',
+            toolReason: r.reason || undefined,
+            screenshotB64: r._screenshot_b64 ?? msg.screenshotB64,
+          } : msg))
+          if (r.denied) {
+            setMsgs(p => [...p, {
+              role: 'tool_denied',
+              content: r.reason
+                ? `You denied \`${tc.function.name}()\` — ${r.reason}`
+                : `You denied \`${tc.function.name}()\`.`,
+            }])
+          }
           if (r._screenshot_b64) {
-            setMsgs(p => {
-              const next = [...p]
-              const idx = next.length - 1
-              next[idx] = { ...next[idx], screenshotB64: r._screenshot_b64 }
-              return next
-            })
             const { _screenshot_b64, ...rRest } = r
             const toolContent: any = [
               { type: 'text', text: JSON.stringify({ ...rRest, screenshot: 'attached' }) },
@@ -620,7 +921,13 @@ export default function AIPanel({
   const hasKey = !!aiConfig.apiKey
 
   return (
-    <div style={{ width: panelW, flexShrink: 0, borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg-sidebar)', position: 'relative' }}>
+    <SurfaceFrame
+      targetId="panel:ai-chat"
+      role="panel"
+      glass="panel"
+      style={{ width: panelW, flexShrink: 0, borderLeft: '1px solid var(--border)', position: 'relative' }}
+      contentStyle={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}
+    >
       {/* Left drag handle */}
       <div
         onMouseDown={startDrag}
@@ -685,7 +992,7 @@ export default function AIPanel({
       <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px', position: 'relative' }}>
         {/* History overlay */}
         {showHistory && (
-          <div style={{ position: 'absolute', inset: 0, background: 'var(--bg-sidebar)', zIndex: 10, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column' }}>
+          <div className="glass-surface glass-popup" style={{ position: 'absolute', inset: 0, zIndex: 'var(--z-popover)', overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column' }}>
             <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 10 }}>Chat History</div>
             {sessions.length === 0 && <div style={{ color: 'var(--text-faint)', fontSize: '0.8rem' }}>No saved sessions yet.</div>}
             {[...sessions].sort((a, b) => b.updatedAt - a.updatedAt).map(s => (
@@ -702,16 +1009,16 @@ export default function AIPanel({
         )}
         {/* Context overlay */}
         {showCtx && (
-          <div style={{ position: 'absolute', inset: 0, background: 'var(--bg-sidebar)', zIndex: 10, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column' }}>
+          <div className="glass-surface glass-popup" style={{ position: 'absolute', inset: 0, zIndex: 'var(--z-popover)', overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column' }}>
             <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', letterSpacing: '0.14em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 10 }}>Live Context</div>
             <pre style={{ margin: 0, color: 'var(--text-faint)', fontSize: '0.73rem', fontFamily: 'monospace', lineHeight: 1.75, whiteSpace: 'pre-wrap', wordBreak: 'break-word', flex: 1 }}>{ctxText}</pre>
             <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border-subtle)' }}>This context is automatically injected into every AI request. Use tools like read_note, get_all_tasks, get_all_events, read_board for full data.</div>
           </div>
         )}
         {msgs.length === 0 && (
-          <div style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.82rem', marginTop: 44, lineHeight: 1.9, padding: '0 8px' }}>
-            <div style={{ marginBottom: 12, opacity: 0.3 }}><NucleusLogo size={36} /></div>
-            Ask me anything — I can control the app, create content, generate images, and more.
+          <div style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: '0.84rem', marginTop: 52, lineHeight: 1.9, padding: '0 12px' }}>
+            <div style={{ marginBottom: 14, opacity: 0.3 }}><NucleusLogo size={36} /></div>
+            Ask for changes, planning, notes, images, boards, or appearance previews.
           </div>
         )}
         {(() => {
@@ -731,7 +1038,7 @@ export default function AIPanel({
           }
           return grouped.map((g, gi) => {
             if (g.type === 'thinking') {
-              return <ThinkingBlock key={`t-${g.startIdx}`} calls={g.calls} />
+              return <ThinkingBlock key={`t-${g.startIdx}`} calls={g.calls} defaultCollapsed={!g.calls.some(call => call.toolStatus === 'running')} />
             }
             const m = g.msg
             return (
@@ -747,14 +1054,27 @@ export default function AIPanel({
                   ))}
                 </div>
               </div>
+            ) : m.role === 'tool_denied' ? (
+              <div style={{
+                maxWidth: '94%',
+                background: 'color-mix(in srgb, var(--orange) 10%, var(--bg-elevated))',
+                borderRadius: '14px 14px 14px 4px',
+                padding: '10px 12px',
+                color: 'var(--text-secondary)',
+                fontSize: '0.8rem',
+                lineHeight: 1.6,
+                border: '1px solid color-mix(in srgb, var(--orange) 42%, var(--border))',
+              }}>
+                {m.content}
+              </div>
             ) : (
               <div style={{
-                maxWidth: '93%',
+                maxWidth: '94%',
                 background: m.role === 'user' ? 'var(--accent-surface)' : 'var(--bg-elevated)',
                 borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                padding: '9px 12px',
+                padding: '11px 13px',
                 color: m.role === 'user' ? '#d4c4ff' : 'var(--text-secondary)',
-                fontSize: '0.83rem', lineHeight: 1.65,
+                fontSize: '0.84rem', lineHeight: 1.7,
                 border: m.role === 'assistant' ? '1px solid var(--border)' : 'none',
               }}>
                 {m.refImgs?.map((src, j) => <img key={j} src={src} style={{ width: '100%', borderRadius: 6, marginBottom: 6, display: 'block' }} />)}
@@ -768,19 +1088,23 @@ export default function AIPanel({
         {streamingMsg !== null && (
           <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 4 }}>
             <div style={{
-              maxWidth: '90%', padding: '8px 11px', borderRadius: 10, fontSize: '0.82rem', lineHeight: 1.55,
+              maxWidth: '94%', padding: '10px 12px', borderRadius: 14, fontSize: '0.84rem', lineHeight: 1.65,
               background: 'var(--bg-surface)', color: 'var(--text-primary)', border: '1px solid var(--border)',
             }}>
               {streamingMsg ? <Markdown text={streamingMsg} /> : (
-                <div style={{ display: 'flex', gap: 4 }}>
-                  {[0, 1, 2].map(i => <div key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', animation: `nuc-pulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />)}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.76rem' }}>Thinking…</span>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {[0, 1, 2].map(i => <div key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', animation: `nuc-pulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />)}
+                  </div>
                 </div>
               )}
             </div>
           </div>
         )}
         {loading && streamingMsg === null && (
-          <div style={{ display: 'flex', gap: 4, padding: '6px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 2px' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.76rem' }}>Working…</span>
             {[0, 1, 2].map(i => <div key={i} style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', animation: `nuc-pulse 1.2s ease-in-out ${i * 0.2}s infinite` }} />)}
           </div>
         )}
@@ -789,7 +1113,7 @@ export default function AIPanel({
 
       {/* Approval card */}
       {pendingApproval && (
-        <div style={{ margin: '0 10px 8px', background: 'var(--bg-surface)', border: '1px solid var(--border-focus)', borderRadius: 10, padding: '12px 14px', flexShrink: 0 }}>
+        <div style={{ margin: '0 10px 8px', background: 'var(--bg-surface)', border: '1px solid var(--border-focus)', borderRadius: 14, padding: '14px 14px 12px', flexShrink: 0 }}>
           <div style={{ fontSize: '0.72rem', color: 'var(--orange)', fontWeight: 700, marginBottom: 6, letterSpacing: '0.06em' }}>PERMISSION REQUEST</div>
           <div style={{ fontFamily: 'monospace', color: 'var(--accent-light)', fontSize: '0.8rem', marginBottom: 6 }}>{pendingApproval.toolName}()</div>
           {Object.entries(pendingApproval.toolArgs).slice(0, 3).map(([k, v]) => (
@@ -797,9 +1121,41 @@ export default function AIPanel({
               {k}: <span style={{ color: 'var(--text-muted)' }}>{String(v).slice(0, 60)}</span>
             </div>
           ))}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
+            {approvalReasonChoices.map((reason) => {
+              const active = approvalReasonChip === reason
+              return (
+                <button
+                  key={reason}
+                  onClick={() => {
+                    setApprovalReasonChip(active ? '' : reason)
+                    if (!approvalReason) setApprovalReason(active ? '' : reason)
+                  }}
+                  style={{
+                    padding: '6px 10px',
+                    borderRadius: 999,
+                    border: `1px solid ${active ? 'var(--orange)' : 'var(--border)'}`,
+                    background: active ? 'color-mix(in srgb, var(--orange) 12%, transparent)' : 'transparent',
+                    color: active ? 'var(--orange)' : 'var(--text-muted)',
+                    cursor: 'pointer',
+                    fontSize: '0.72rem',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {reason}
+                </button>
+              )
+            })}
+          </div>
+          <input
+            value={approvalReason}
+            onChange={(event) => setApprovalReason(event.target.value)}
+            placeholder="Optional reason to send back to the assistant"
+            style={{ width: '100%', marginTop: 10, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 10, padding: '9px 11px', color: 'var(--text-secondary)', fontSize: '0.76rem', outline: 'none', fontFamily: 'inherit' }}
+          />
           <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-            <button onClick={() => pendingApproval.resolve(true)} style={{ flex: 1, padding: '7px', background: 'var(--accent)', border: 'none', borderRadius: 7, color: '#fff', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'inherit' }}>Allow</button>
-            <button onClick={() => pendingApproval.resolve(false)} style={{ flex: 1, padding: '7px', background: 'none', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'inherit' }}>Deny</button>
+            <button onClick={() => pendingApproval.resolve({ approved: true })} style={{ flex: 1, padding: '8px', background: 'var(--accent)', border: 'none', borderRadius: 9, color: '#fff', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'inherit' }}>Allow</button>
+            <button onClick={() => pendingApproval.resolve({ approved: false, reason: approvalReason.trim() || approvalReasonChip || undefined })} style={{ flex: 1, padding: '8px', background: 'none', border: '1px solid var(--border)', borderRadius: 9, color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'inherit' }}>Deny</button>
           </div>
         </div>
       )}
@@ -815,7 +1171,7 @@ export default function AIPanel({
           </div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
             <button onClick={() => pendingImg.resolve('insert')} style={{ flex: 1, padding: '7px', background: 'var(--accent)', border: 'none', borderRadius: 7, color: '#fff', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer', fontFamily: 'inherit' }}>
-              {pendingImg.args.scope ? 'Insert to Board' : 'Accept'}
+              {pendingImg.args.board_id ? 'Insert to Board' : 'Accept'}
             </button>
             <button onClick={() => pendingImg.resolve('discard')} style={{ padding: '7px 12px', background: 'none', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text-faint)', fontSize: '0.75rem', cursor: 'pointer', fontFamily: 'inherit' }}>Discard</button>
           </div>
@@ -848,26 +1204,32 @@ export default function AIPanel({
       )}
 
       {/* Input */}
-      <div className="liquid-glass-subtle" style={{ padding: '10px 12px', margin: '0 8px 8px', borderRadius: 12, display: 'flex', gap: 6, flexShrink: 0, alignItems: 'flex-end' }}>
+      <div className="glass-surface glass-floating" style={{ padding: '12px', margin: '0 8px 8px', borderRadius: 18, display: 'flex', gap: 10, flexShrink: 0, alignItems: 'flex-end' }}>
         <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFileSelect} style={{ display: 'none' }} />
-        <button onClick={() => fileRef.current?.click()} title="Attach image reference" style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 9px', color: 'var(--text-faint)', cursor: 'pointer', flexShrink: 0, lineHeight: 0 }}>
+        <button onClick={() => fileRef.current?.click()} title="Attach image reference" style={{ background: 'color-mix(in srgb, var(--bg-elevated) 80%, transparent)', border: '1px solid var(--border)', borderRadius: 12, padding: '11px', color: 'var(--text-secondary)', cursor: 'pointer', flexShrink: 0, lineHeight: 0 }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8.5 13.5l2.5 3 3.5-4.5 4.5 6H5z"/><circle cx="8.5" cy="8.5" r="1.5"/></svg>
         </button>
-        <input
+        <textarea
           value={input} onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
-          placeholder={hasKey ? 'Ask or command...' : 'Add API key in AI Settings'}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              void send()
+            }
+          }}
+          placeholder={hasKey ? 'Message Nucleus…' : 'Add API key in AI Settings'}
           disabled={!hasKey}
-          style={{ flex: 1, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '9px 12px', color: 'var(--text-primary)', fontSize: '0.84rem', outline: 'none', fontFamily: 'inherit', opacity: hasKey ? 1 : 0.5 }}
+          rows={3}
+          style={{ flex: 1, minHeight: 76, maxHeight: 180, resize: 'vertical', background: 'color-mix(in srgb, var(--bg-surface) 86%, transparent)', border: '1px solid var(--border)', borderRadius: 14, padding: '12px 14px', color: 'var(--text-primary)', fontSize: '0.86rem', lineHeight: 1.55, outline: 'none', fontFamily: 'inherit', opacity: hasKey ? 1 : 0.5 }}
         />
         <button onClick={send} disabled={loading || !input.trim() || !hasKey} style={{
-          background: 'var(--accent)', border: 'none', borderRadius: 'var(--radius)', padding: '9px 12px',
+          background: 'var(--accent)', border: 'none', borderRadius: 14, padding: '12px 13px',
           color: '#fff', cursor: 'pointer', opacity: loading || !input.trim() || !hasKey ? 0.35 : 1,
           flexShrink: 0, transition: 'opacity 0.15s', lineHeight: 0,
         }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" /></svg>
         </button>
       </div>
-    </div>
+    </SurfaceFrame>
   )
 }

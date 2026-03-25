@@ -1,5 +1,122 @@
 /* ── App sections ── */
-export type Section = 'today' | 'notes' | 'whiteboard' | 'me' | 'calendar' | 'pomodoro' | 'settings' | 'ai-settings' | 'artefacts'
+export type Section = 'today' | 'notes' | 'boards' | 'memories' | 'calendar' | 'pomodoro' | 'settings' | 'ai-settings' | 'artefacts'
+
+/* ── Board collections ── */
+export type BoardScope = 'whiteboards' | 'me'
+export type BoardCollection = 'boards' | 'personal'
+
+/* ── Appearance surfaces ── */
+export type SurfaceRole = 'appShell' | 'page' | 'panel' | 'popup'
+export type SurfaceTargetId =
+  | 'app-shell'
+  | `page:${Section}`
+  | `panel:${string}`
+  | `popup:${string}`
+
+export type BackgroundBlendMode = 'normal' | 'screen' | 'overlay' | 'soft-light' | 'lighten'
+export type BackgroundAnchor = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center'
+export type BackgroundMediaType = 'image' | 'video'
+export type BackgroundMediaFit = 'cover' | 'contain'
+export type BackgroundGradientStyle = 'theme-orbit' | 'theme-rings' | 'theme-mesh'
+export type BackgroundSimulationEngine = 'starfield' | 'linked-particles' | 'game-of-life' | 'evolving-shapes'
+
+export interface BackgroundPresetBase {
+  id: string
+  name: string
+  kind: 'gradient' | 'simulation' | 'media' | 'artefact'
+  opacity: number
+  blur: number
+  blendMode: BackgroundBlendMode
+  builtin?: boolean
+}
+
+export interface GradientBackgroundPreset extends BackgroundPresetBase {
+  kind: 'gradient'
+  gradient: {
+    style: BackgroundGradientStyle
+    intensity: number
+    motion: number
+    softness: number
+  }
+}
+
+export interface SimulationBackgroundPreset extends BackgroundPresetBase {
+  kind: 'simulation'
+  simulation: {
+    engine: BackgroundSimulationEngine
+    speed: number
+    density: number
+    detail: number
+  }
+}
+
+export interface MediaBackgroundPreset extends BackgroundPresetBase {
+  kind: 'media'
+  media: {
+    src: string
+    mediaType: BackgroundMediaType
+    fit: BackgroundMediaFit
+    drift: number
+    muted: boolean
+    loop: boolean
+    playbackRate: number
+  }
+}
+
+export interface ArtefactBackgroundPreset extends BackgroundPresetBase {
+  kind: 'artefact'
+  artefact: {
+    artefactId: string
+    scale: number
+    injectTheme: boolean
+  }
+}
+
+export type BackgroundPreset =
+  | GradientBackgroundPreset
+  | SimulationBackgroundPreset
+  | MediaBackgroundPreset
+  | ArtefactBackgroundPreset
+
+export interface BackgroundOrnament {
+  id: string
+  presetId: string
+  x: number
+  y: number
+  w: number
+  h: number
+  rotation: number
+  opacity: number
+  blur: number
+  zIndex: number
+  blendMode: BackgroundBlendMode
+  anchor: BackgroundAnchor
+  locked?: boolean
+}
+
+export interface BackgroundAssignment {
+  presetId: string | null
+  opacity: number
+  blur: number
+  ornaments: BackgroundOrnament[]
+}
+
+export interface GlassPreset {
+  tint: number
+  blur: number
+  saturation: number
+  border: number
+  glow: number
+  shadow: number
+  specular: number
+  noise: number
+}
+
+export interface GlassSettings {
+  panel: GlassPreset
+  floating: GlassPreset
+  popup: GlassPreset
+}
 
 /* ── Tasks ── */
 export interface Task {
@@ -106,14 +223,12 @@ export interface Artefact {
 }
 
 /* ── Pomodoro ── */
-export type PomBgType = 'none' | 'starfield' | 'pixel-galaxy' | 'fractal' | 'evolving-shapes' | 'custom-image'
-
 export interface PomodoroSettings {
   work: number
   short: number
   long: number
   rounds: number
-  bgType?: PomBgType
+  bgType?: 'none' | 'starfield' | 'pixel-galaxy' | 'fractal' | 'evolving-shapes' | 'custom-image'
   bgParams?: Record<string, number>
   bgImageSrc?: string
 }
@@ -122,6 +237,7 @@ export interface PomodoroSettings {
 export interface ThemeDefinition {
   id: string
   name: string
+  builtin?: boolean
   font: string
   fontHeading: string
   fontMono: string
@@ -146,11 +262,36 @@ export interface ThemeDefinition {
   red: string
   orange: string
   pink: string
+  surfaceDefaults: Record<SurfaceRole, BackgroundAssignment>
+  glass: GlassSettings
 }
 
 export interface ThemeSettings {
   activeThemeId: string
   themes: ThemeDefinition[]
+  backgroundPresets: BackgroundPreset[]
+  surfaceOverrides: Record<string, BackgroundAssignment>
+}
+
+/* ── Memories ── */
+export interface MemoryFileNode {
+  path: string
+  name: string
+  content: string
+  updatedAt: number
+}
+
+export interface MemoryDirectoryNode {
+  path: string
+  name: string
+  files: MemoryFileNode[]
+  directories: MemoryDirectoryNode[]
+}
+
+export interface MemoryTree {
+  root: MemoryDirectoryNode
+  overviewPath: string
+  agentSummaryPath: string
 }
 
 /* ── AI config ── */

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { Artefact, ArtefactType } from '../lib/types'
 import { uid } from '../lib/helpers'
+import SurfaceFrame from './SurfaceFrame'
 
 interface Props {
   artefacts: Artefact[]
@@ -280,7 +281,10 @@ export default function ArtefactsSection({ artefacts, setArtefacts }: Props) {
   }, [artefacts, selected])
 
   useEffect(() => {
-    if (sel) setTitleBuf(sel.title)
+    if (sel) {
+      setTitleBuf(sel.title)
+      setView(sel.type === 'html' ? 'preview' : 'split')
+    }
   }, [selected]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const update = (patch: Partial<Artefact>) => {
@@ -295,6 +299,7 @@ export default function ArtefactsSection({ artefacts, setArtefacts }: Props) {
     }
     setArtefacts(p => [a, ...p])
     setSelected(a.id)
+    setView('preview')
   }
 
   const deleteArtefact = (id: string) => {
@@ -323,6 +328,7 @@ export default function ArtefactsSection({ artefacts, setArtefacts }: Props) {
       const a: Artefact = { id: uid(), title, type, code, createdAt: Date.now(), updatedAt: Date.now() }
       setArtefacts(p => [a, ...p])
       setSelected(a.id)
+      setView(type === 'html' ? 'preview' : 'split')
     }
     reader.readAsText(file)
     e.target.value = ''
@@ -350,13 +356,20 @@ export default function ArtefactsSection({ artefacts, setArtefacts }: Props) {
   return (
     <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
       {/* ── Left sidebar ── */}
-      <div style={{
-        width: sbCollapsed ? 32 : sbW, flexShrink: 0,
-        borderRight: '1px solid var(--border-subtle)',
-        display: 'flex', flexDirection: 'column',
-        background: 'var(--bg-sidebar)', overflow: 'hidden',
-        position: 'relative', transition: sbDragging.current ? 'none' : 'width 0.15s',
-      }}>
+      <SurfaceFrame
+        targetId="panel:artefacts-sidebar"
+        role="panel"
+        glass="panel"
+        style={{
+          width: sbCollapsed ? 32 : sbW,
+          flexShrink: 0,
+          borderRight: '1px solid var(--border-subtle)',
+          overflow: 'hidden',
+          position: 'relative',
+          transition: sbDragging.current ? 'none' : 'width 0.15s',
+        }}
+        contentStyle={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}
+      >
         {/* Collapse toggle */}
         <button
           onClick={toggleSb}
@@ -411,10 +424,12 @@ export default function ArtefactsSection({ artefacts, setArtefacts }: Props) {
                   }}
                   style={{
                     width: '100%', boxSizing: 'border-box',
-                    background: 'var(--bg-input)', border: '1px solid var(--accent)',
-                    borderRadius: 7, padding: '6px 10px',
-                    color: 'var(--text-primary)', fontSize: '0.82rem',
+                    background: 'color-mix(in srgb, var(--accent-surface) 82%, transparent)',
+                    border: '1px solid var(--accent)',
+                    borderRadius: 10, padding: '8px 11px',
+                    color: 'var(--text-primary)', fontSize: '0.84rem', fontStyle: 'italic',
                     outline: 'none', fontFamily: 'inherit',
+                    boxShadow: '0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent)',
                   }}
                 />
               ) : (
@@ -486,7 +501,7 @@ export default function ArtefactsSection({ artefacts, setArtefacts }: Props) {
             }}
           />
         )}
-      </div>
+      </SurfaceFrame>
 
       {/* ── Right panel ── */}
       {!sel ? (
@@ -515,7 +530,7 @@ export default function ArtefactsSection({ artefacts, setArtefacts }: Props) {
             {/* Type toggle */}
             <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
               {(['html', 'react'] as ArtefactType[]).map(t => (
-                <button key={t} onClick={() => update({ type: t })} style={{
+                <button key={t} onClick={() => { update({ type: t }); setView(t === 'html' ? 'preview' : 'split') }} style={{
                   padding: '4px 10px', borderRadius: 6, border: `1px solid ${sel.type === t ? (t === 'react' ? 'var(--blue)' : 'var(--green)') : 'var(--border)'}`,
                   background: sel.type === t ? (t === 'react' ? 'rgba(41,97,219,0.12)' : 'rgba(5,150,105,0.12)') : 'transparent',
                   color: sel.type === t ? (t === 'react' ? 'var(--blue)' : 'var(--green)') : 'var(--text-faint)',

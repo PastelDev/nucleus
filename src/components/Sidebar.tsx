@@ -1,5 +1,6 @@
 import type { Section } from '../lib/types'
 import NucleusLogo from './NucleusLogo'
+import SurfaceFrame from './SurfaceFrame'
 
 interface NavItem {
   id: Section
@@ -10,8 +11,8 @@ interface NavItem {
 const NAV: NavItem[] = [
   { id: 'today', label: 'Today', icon: 'M8 2v3M16 2v3M3 9h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z' },
   { id: 'notes', label: 'Notes', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8' },
-  { id: 'whiteboard', label: 'Board', icon: 'M2 3a1 1 0 0 1 1-1h18a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1zm3 16h14M8 17v2M16 17v2' },
-  { id: 'me', label: 'Me', icon: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z' },
+  { id: 'boards', label: 'Boards', icon: 'M2 3a1 1 0 0 1 1-1h18a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1zm3 16h14M8 17v2M16 17v2' },
+  { id: 'memories', label: 'Memories', icon: 'M6 4h12a2 2 0 0 1 2 2v12l-4-2-4 2-4-2-4 2V6a2 2 0 0 1 2-2zm3 4h6M9 11h6' },
   { id: 'calendar', label: 'Calendar', icon: 'M19 4H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zM16 2v4M8 2v4M3 10h18' },
   { id: 'pomodoro', label: 'Focus', icon: 'M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zM12 6v6l4 2' },
   { id: 'artefacts', label: 'Artefacts', icon: 'M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm0 5h16M8 3v5' },
@@ -33,17 +34,23 @@ export default function Sidebar({ section, setSection, aiOpen, setAiOpen, collap
   const w = collapsed ? 52 : 196
 
   return (
-    <div style={{
-      width: w,
-      flexShrink: 0,
-      background: 'var(--bg-sidebar)',
-      borderRight: '1px solid var(--border-subtle)',
-      display: 'flex',
-      flexDirection: 'column',
-      padding: collapsed ? '20px 6px 16px' : '20px 9px 16px',
-      transition: 'width 0.2s ease',
-      overflow: 'hidden',
-    }}>
+    <SurfaceFrame
+      targetId="panel:sidebar"
+      role="panel"
+      glass="panel"
+      style={{
+        width: w,
+        flexShrink: 0,
+        borderRight: '1px solid var(--border-subtle)',
+        transition: 'width 0.2s ease',
+      }}
+      contentStyle={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        padding: collapsed ? '20px 6px 16px' : '20px 9px 16px',
+      }}
+    >
       {/* Logo */}
       <div
         className="liquid-glass-subtle"
@@ -211,6 +218,6 @@ export default function Sidebar({ section, setSection, aiOpen, setAiOpen, collap
           Nucleus v2.0
         </div>
       )}
-    </div>
+    </SurfaceFrame>
   )
 }

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { CalendarEvent, EventRecurrence } from '../lib/types'
 import { uid, today, fmtDate, EVENT_PALETTE } from '../lib/helpers'
 import { listEventOccurrencesForDate, recurrenceLabel } from '../lib/calendar'
+import SurfaceFrame from './SurfaceFrame'
 
 interface Props {
   events: CalendarEvent[]
@@ -106,10 +107,18 @@ export default function CalendarSection({ events, setEvents }: Props) {
 
       {/* Day detail panel */}
       {selDay && (
-        <div style={{
-          width: 252, borderLeft: '1px solid var(--border)', padding: '22px 16px',
-          overflow: 'auto', flexShrink: 0, background: 'var(--bg-sidebar)',
-        }}>
+        <SurfaceFrame
+          targetId="panel:calendar-detail"
+          role="panel"
+          glass="panel"
+          style={{
+            width: 252,
+            borderLeft: '1px solid var(--border)',
+            overflow: 'auto',
+            flexShrink: 0,
+          }}
+          contentStyle={{ padding: '22px 16px' }}
+        >
           <div style={{ fontWeight: 800, color: 'var(--text-secondary)', marginBottom: 16, fontSize: '0.9rem', fontFamily: 'var(--font-heading)' }}>
             {fmtDate(dk(selDay))}
           </div>
@@ -168,7 +177,7 @@ export default function CalendarSection({ events, setEvents }: Props) {
               </div>
             ))
           )}
-        </div>
+        </SurfaceFrame>
       )}
     </div>
   )
